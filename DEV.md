@@ -1,23 +1,23 @@
 # 本地开发启动方式
 
-工作区 `D:\www\EsportsPartner` 是 pnpm workspace，下面并列五个服务，每个都要单独起进程：
+仓库根是 `D:\www\EsportsPartner\e-sports-uniapp`（pnpm workspace），三个 uni-app 端各在一个 git 分支；外层 `D:\www\EsportsPartner` 只放后端与管理端两个独立仓库。
 
-| 服务 | 目录 | 启动命令 | 端口 |
-|---|---|---|---|
-| 后端 API（Go + Fiber + Ent） | `go-admin` | `$env:ESPORTS_EXPERIMENTAL='1'; go run main.go` | 9501 |
-| 管理端（Vue 3 + Arco + Vite） | `go-admin-web` | `pnpm run dev` | 5173 |
-| 用户端 H5（uni-app） | `e-sports-customer-uniapp` | `pnpm dev:h5` | 5174 |
-| 陪玩端 H5（uni-app） | `e-sports-player-uniapp` | `pnpm dev:h5` | 5175 |
-| 客服端 H5（uni-app） | `e-sports-uniapp` | `pnpm dev:h5` | 5176 |
+| 服务 | 位置 | 分支 | 启动命令 | 端口 |
+|---|---|---|---|---|
+| 后端 API（Go + Fiber + Ent） | 外层 `go-admin` | 独立仓库 | `$env:ESPORTS_EXPERIMENTAL='1'; go run main.go` | 9501 |
+| 管理端（Vue 3 + Arco + Vite） | 外层 `go-admin-web` | 独立仓库 | `pnpm run dev` | 5173 |
+| 用户端 H5（uni-app） | `e-sports-customer-uniapp` | `customer` | `pnpm run dev:customer` | 5174 |
+| 陪玩端 H5（uni-app） | `e-sports-player-uniapp` | `player` | `pnpm run dev:player` | 5175 |
+| 客服端 H5（uni-app） | 仓库根 | `cs` | `pnpm run dev:h5` | 5176 |
 
-> 三个 uni-app 端共用 `packages/esports-shared`（请求层 / API / 工具函数），改动共享包会同时生效到三端。
+> `master` 只放共享包 `packages/esports-shared` 与工程配置；三个端分别提交在 `customer` / `player` / `cs` 分支。同一工作区一次只有一个端，切分支即切换端代码。
 
 ## 0. 开工前先确认
 
 首次拉代码或共享包有改动后，先在根目录安装一次（`@esports/shared` 是 workspace 依赖）：
 
 ```powershell
-cd D:\www\EsportsPartner
+cd D:\www\EsportsPartner\e-sports-uniapp
 pnpm install --no-frozen-lockfile
 ```
 
@@ -69,11 +69,13 @@ pnpm run dev
 - 路由是 hash 模式，直接用 `/index.html` 或 `#/login` 访问。
 - `go-admin-web` 不在 workspace 成员内，独立 `pnpm install` 与启动。
 
-### 1.3 用户端 H5（5174）
+### 1.3 用户端 H5（5174，`customer` 分支）
 
 ```powershell
-cd D:\www\EsportsPartner\e-sports-customer-uniapp
-pnpm dev:h5
+cd D:\www\EsportsPartner\e-sports-uniapp
+git checkout customer
+pnpm install --no-frozen-lockfile
+pnpm run dev:customer
 ```
 
 → http://localhost:5174/
@@ -81,11 +83,13 @@ pnpm dev:h5
 - 页面：报单 / 订单 / 我的，登录页 `/pages/login/index`，实名页 `/pages/identity/index`（固定客户身份）。
 - 示例账号：`customer01 / 13900000002 / admin123456`。
 
-### 1.4 陪玩端 H5（5175）
+### 1.4 陪玩端 H5（5175，`player` 分支）
 
 ```powershell
-cd D:\www\EsportsPartner\e-sports-player-uniapp
-pnpm dev:h5
+cd D:\www\EsportsPartner\e-sports-uniapp
+git checkout player
+pnpm install --no-frozen-lockfile
+pnpm run dev:player
 ```
 
 → http://localhost:5175/
@@ -94,11 +98,13 @@ pnpm dev:h5
 - 陪玩上下线心跳只在本端 `App.vue` 里，进后台自动停止。
 - 示例账号：`player01 / 13900000001 / admin123456`。
 
-### 1.5 客服端 H5（5176）
+### 1.5 客服端 H5（5176，`cs` 分支）
 
 ```powershell
 cd D:\www\EsportsPartner\e-sports-uniapp
-pnpm dev:h5
+git checkout cs
+pnpm install --no-frozen-lockfile
+pnpm run dev:h5
 ```
 
 → http://localhost:5176/
@@ -144,15 +150,15 @@ curl.exe -s -o NUL -w "proxy=%{http_code}`n"     http://127.0.0.1:5174/api/v1/es
 ## 4. 目录速览
 
 ```
-D:\www\EsportsPartner
-├─ go-admin\                   后端（独立 git 仓库；启动/规范见 go-admin\AGENTS.md）
-├─ go-admin-web\               管理端（独立安装，不在 workspace 内）
-├─ e-sports-customer-uniapp\   用户端（H5 / 小程序）
-├─ e-sports-player-uniapp\     陪玩端（H5 / 小程序）
-├─ e-sports-uniapp\            客服端（H5 / 小程序）
-├─ packages\esports-shared\    三端共享：请求层、API、工具函数
-├─ .dev-logs\                  可选：免窗口启动器 run-web-*.cmd 及其输出日志
-└─ DEV.md                      本文件
+D:\www\EsportsPartner\                外层
+├─ go-admin\                         后端（独立 git 仓库；规范见 go-admin\AGENTS.md）
+├─ go-admin-web\                     管理端（独立安装，不在 workspace 内）
+├─ .dev-logs\                        可选：免窗口启动器 run-web-*.cmd 及其输出日志
+└─ e-sports-uniapp\                  前端仓库根（git 仓库，含 DEV.md）
+   ├─ packages\esports-shared\       三端共享：请求层、API、工具函数（master 分支）
+   ├─ e-sports-customer-uniapp\      用户端（customer 分支）
+   ├─ e-sports-player-uniapp\        陪玩端（player 分支）
+   └─ src\、vite.config.ts 等        客服端（cs 分支，客服端就是仓库根应用）
 ```
 
 `go-admin\AGENTS.md` 另有后端专属约定（代码生成顺序、权限声明、测试、提交规范），改后端前先读它。
