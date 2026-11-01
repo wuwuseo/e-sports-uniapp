@@ -1,0 +1,69 @@
+{
+  "pages": [
+    {
+      "path": "pages/cs/login",
+      "style": { "navigationBarTitleText": "客服登录" }
+    },
+    {
+      "path": "pages/cs/workbench",
+      "style": { "navigationBarTitleText": "客服工作台" }
+    },
+    {
+      "path": "pages/cs/customers",
+      "style": { "navigationBarTitleText": "客户列表" }
+    },
+    {
+      "path": "pages/cs/customer-detail",
+      "style": { "navigationBarTitleText": "客户档案" }
+    },
+    {
+      "path": "pages/cs/order-create",
+      "style": { "navigationBarTitleText": "报单建单" }
+    },
+    {
+      "path": "pages/cs/orders",
+      "style": { "navigationBarTitleText": "客服订单" }
+    },
+    {
+      "path": "pages/cs/order-detail",
+      "style": { "navigationBarTitleText": "订单跟进" }
+    },
+    {
+      "path": "pages/cs/scripts",
+      "style": { "navigationBarTitleText": "话术库" }
+    },
+    {
+      "path": "pages/cs/after-sales",
+      "style": { "navigationBarTitleText": "售后处理" }
+    },
+    {
+      "path": "pages/cs/member-levels",
+      "style": { "navigationBarTitleText": "会员等级" }
+    },
+    {
+      "path": "pages/cs/gift",
+      "style": { "navigationBarTitleText": "代客送礼" }
+    },
+    {
+      "path": "pages/wecom/index",
+      "style": { "navigationBarTitleText": "企微侧边栏" }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "客服工作台",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F5F6F8"
+  },
+  "tabBar": {
+    "color": "#8A8F99",
+    "selectedColor": "#165DFF",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/cs/workbench", "text": "工作台" },
+      { "pagePath": "pages/cs/customers", "text": "客户" },
+      { "pagePath": "pages/cs/orders", "text": "订单" }
+    ]
+  }
+}
