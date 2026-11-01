@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // 接口实现已迁入共享包（本端 src/api/cs.ts 只是薄转发），检查对象改为真实实现文件。
 const csApi = readFileSync(
-  join(root, '..', 'packages/esports-shared/src/api/cs.ts'),
+  join(root, 'packages/esports-shared/src/api/cs.ts'),
   'utf8'
 );
 const csPage = readFileSync(join(root, 'src/pages/cs/order-detail.vue'), 'utf8');

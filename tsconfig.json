@@ -8,9 +8,9 @@
       // 共享包只提供 exports 子路径，TS 4.9 的 node 解析不认 exports 字段，
       // 这里补一层回退映射，让类型检查也能解析 @esports/shared/*。
       "@esports/shared/*": [
-        "../packages/esports-shared/src/*",
-        "../packages/esports-shared/src/api/*",
-        "../packages/esports-shared/src/utils/*"
+        "./packages/esports-shared/src/*",
+        "./packages/esports-shared/src/api/*",
+        "./packages/esports-shared/src/utils/*"
       ]
     },
     "lib": ["esnext", "dom"],
