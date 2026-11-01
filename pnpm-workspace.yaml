@@ -1,0 +1,4 @@
+packages:
+  # 共享包与三端 uni-app；go-admin-web 保持独立，不纳入 workspace
+  - 'packages/*'
+  - 'e-sports-*'

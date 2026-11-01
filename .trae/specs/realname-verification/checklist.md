@@ -1,0 +1,24 @@
+# Checklist
+
+- [x] 统一实名档案表与核验流水表已建立，索引与唯一约束符合 spec
+- [x] 证件号原号不落库、不写日志，接口只返回脱敏值
+- [x] 四种渠道（wechat / alipay / third_party / manual）均已接入 provider 抽象，manual 始终可用（微信 / 支付宝为骨架，`ready()` 恒 false，未接入前不注册）
+- [x] 二要素同步核验、人脸异步核验（跳转 / 二维码 + 回调 / 轮询）均可落定状态
+- [x] 渠道异常时不静默通过，返回中文提示并引导人工审核
+- [x] 状态机覆盖 pending / verified / rejected / expired，已实名重复提交返回冲突
+- [x] `pending` 超时任务把档案置 `expired`、流水置 `abandoned`
+- [x] 三个业务门槛默认关闭，配置开启后拦截生效；管理端代下单 / 代充不拦截
+- [x] 拦截返回 `code=403` 并追加 `error_code:"realname_required"` 与 `scope`，前端可识别引导（偏离：保留 `code=HTTP 状态码` 口径）
+- [x] 陪玩接单资格改为读取统一实名档案，行为与现状一致
+- [x] 旧陪玩 `verified` 数据幂等迁移，旧表保留只读且新代码不再引用
+- [x] 旧陪玩实名路由与权限码**保留为兼容别名**（内部转发统一实现），前端改用通用接口（偏离：不删除旧接口）
+- [x] 用户端实名接口主体由路由决定，客户 / 陪玩档案缺失时返回明确中文错误
+- [x] 管理端实名列表 / 详情 / 人工审核 / 代提接口可用，列表补主体名（昵称为空回落 `#ID`）
+- [x] 每日本地上限 `realname_daily_attempt_limit` 生效
+- [x] 回调强制验签、`provider_ref` 唯一索引保证幂等
+- [x] 新增配置键均在 `app.go` 声明并通过 `config_declaration_test.go`
+- [x] uniapp 通用实名页与两个入口可用，状态展示与重提流程正常
+- [x] go-admin-web「实名认证」菜单页可用，陪玩详情页实名区块沿用兼容别名（内部即统一实现）
+- [x] 中英文语言包无缺失
+- [x] `go build ./...`、`go test ./internal/apps/...`、`vue-tsc`、eslint / prettier 全部通过
+- [x] README 已更新（模块说明、配置说明、第三方签名规则）；功能列表为历史需求基线，按其文首约定不删改

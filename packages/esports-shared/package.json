@@ -1,0 +1,30 @@
+{
+  "name": "@esports/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./request": "./src/api/request.ts",
+    "./api/request": "./src/api/request.ts",
+    "./api/esports": "./src/api/esports.ts",
+    "./api/player": "./src/api/player.ts",
+    "./api/cs": "./src/api/cs.ts",
+    "./api/upload": "./src/api/upload.ts",
+    "./api/cs.close-evidence.contract": "./src/api/cs.close-evidence.contract.ts",
+    "./utils/format": "./src/utils/format.ts",
+    "./utils/levels": "./src/utils/levels.ts",
+    "./utils/pay": "./src/utils/pay.ts",
+    "./utils/evidence": "./src/utils/evidence.ts",
+    "./utils/wecom": "./src/utils/wecom.ts"
+  },
+  "dependencies": {
+    "big.js": "^7.0.1",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.32",
+    "@types/big.js": "^7.0.0",
+    "typescript": "^4.9.4"
+  }
+}

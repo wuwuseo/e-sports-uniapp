@@ -1,0 +1,11 @@
+{
+  "name": "esports-partner",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev:customer": "pnpm --dir e-sports-customer-uniapp run dev:h5",
+    "dev:player": "pnpm --dir e-sports-player-uniapp run dev:h5",
+    "dev:cs": "pnpm --dir e-sports-uniapp run dev:h5",
+    "type-check": "pnpm -r --filter \"./e-sports-*\" run type-check"
+  }
+}
