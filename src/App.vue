@@ -1,7 +1,26 @@
 <script setup lang="ts">
-  import { onLaunch } from '@dcloudio/uni-app';
+  import { onLaunch, onShow } from '@dcloudio/uni-app';
+  import { watch } from 'vue';
   import { loadSkillLevels } from './utils/levels';
   import { getAdminToken } from './api/cs';
+  import { ensureRealtime, realtimeUnread } from './api/realtime';
+
+  /** tabBar「工作台」索引：未读消息红点跟随实时通道下发的未读数。 */
+  const WORKBENCH_TAB_INDEX = 0;
+
+  function syncUnreadBadge(value: number) {
+    if (value > 0) {
+      uni.setTabBarBadge({
+        index: WORKBENCH_TAB_INDEX,
+        text: value > 99 ? '99+' : `${value}`,
+        fail: () => {},
+      });
+      return;
+    }
+    uni.removeTabBarBadge({ index: WORKBENCH_TAB_INDEX, fail: () => {} });
+  }
+
+  watch(realtimeUnread, syncUnreadBadge, { immediate: true });
 
   onLaunch(() => {
     // 技能等级文案/序数走后端配置，失败时页面按编码原样回显。
@@ -10,6 +29,11 @@
     if (!getAdminToken()) {
       uni.reLaunch({ url: '/pages/cs/login' });
     }
+  });
+
+  // 回前台立即恢复实时通道（新单 / 异常提醒靠它；ensureRealtime 幂等且不等退避）。
+  onShow(() => {
+    ensureRealtime();
   });
 </script>
 

@@ -33,6 +33,10 @@
       "style": { "navigationBarTitleText": "话术库" }
     },
     {
+      "path": "pages/cs/messages",
+      "style": { "navigationBarTitleText": "消息中心" }
+    },
+    {
       "path": "pages/cs/after-sales",
       "style": { "navigationBarTitleText": "售后处理" }
     },

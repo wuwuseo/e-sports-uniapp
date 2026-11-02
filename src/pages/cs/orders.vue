@@ -143,6 +143,7 @@
     { label: '待派单', value: 'pending_dispatch' },
     { label: '抢单中', value: 'grabbing' },
     { label: '待接单', value: 'pending_acceptance' },
+    { label: '待客户确认', value: 'pending_customer_confirm' },
     { label: '已接单', value: 'accepted' },
     { label: '服务中', value: 'in_service' },
     { label: '待结单', value: 'pending_close' },
@@ -414,7 +415,15 @@
   onLoad((query) => {
     if (query?.status) status.value = String(query.status);
   });
-  onShow(load);
+  onShow(() => {
+    // 工作台经 switchTab 跳转时无法携带 query，筛选状态从 storage 取
+    const pendingStatus = (uni.getStorageSync('cs_orders_status') as string) || '';
+    if (pendingStatus) {
+      status.value = pendingStatus;
+      uni.removeStorageSync('cs_orders_status');
+    }
+    load();
+  });
 </script>
 
 <style scoped lang="scss">

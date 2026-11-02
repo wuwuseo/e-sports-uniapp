@@ -21,6 +21,7 @@
   import { onShow } from '@dcloudio/uni-app';
   import { reactive, ref } from 'vue';
   import { adminLogin, getAdminToken, setAdminToken, ADMIN_LOGIN_PATH } from '../../api/cs';
+  import { ensureRealtime } from '../../api/realtime';
 
   const loginPath = ADMIN_LOGIN_PATH;
   const loading = ref(false);
@@ -48,6 +49,8 @@
         return;
       }
       setAdminToken(data.access_token);
+      // 登录后立刻建立实时通道（幂等）；失败会在 App.onShow 再次尝试。
+      ensureRealtime();
       uni.reLaunch({ url: '/pages/cs/workbench' });
     } catch {
       // csRequest 层已提示具体错误。

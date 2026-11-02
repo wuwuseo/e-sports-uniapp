@@ -23,6 +23,10 @@
         <view class="stat-num">{{ poolCount('pending_acceptance') }}</view>
         <view class="muted">待接单</view>
       </view>
+      <view class="stat" @click="goOrders('pending_customer_confirm')">
+        <view class="stat-num">{{ poolCount('pending_customer_confirm') }}</view>
+        <view class="muted">待客户确认</view>
+      </view>
       <view class="stat" @click="goOrders('in_service')">
         <view class="stat-num">{{ poolCount('in_service') }}</view>
         <view class="muted">服务中</view>
@@ -54,33 +58,38 @@
     <view class="card">
       <view class="section-title">快捷入口</view>
       <view class="grid">
-        <view class="entry" @click="go('/pages/cs/order-create')">
+        <view class="entry" @click="open('/pages/cs/order-create')">
           <text class="entry-icon">报</text>
           <text class="entry-text">报单</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/customers')">
+        <view class="entry" @click="open('/pages/cs/customers')">
           <text class="entry-icon">客</text>
           <text class="entry-text">客户</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/orders')">
+        <view class="entry" @click="open('/pages/cs/orders')">
           <text class="entry-icon">单</text>
           <text class="entry-text">订单</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/scripts')">
+        <view class="entry" @click="open('/pages/cs/scripts')">
           <text class="entry-icon">术</text>
           <text class="entry-text">话术</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/after-sales')">
+        <view class="entry" @click="open('/pages/cs/after-sales')">
           <text class="entry-icon">售</text>
           <text class="entry-text">售后</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/gift')">
+        <view class="entry" @click="open('/pages/cs/gift')">
           <text class="entry-icon">礼</text>
           <text class="entry-text">送礼</text>
         </view>
-        <view class="entry" @click="go('/pages/cs/member-levels')">
+        <view class="entry" @click="open('/pages/cs/member-levels')">
           <text class="entry-icon">会</text>
           <text class="entry-text">会员等级</text>
+        </view>
+        <view class="entry" @click="open('/pages/cs/messages')">
+          <text class="entry-icon">信</text>
+          <text class="entry-text">消息</text>
+          <text v-if="unread > 0" class="entry-badge">{{ unread > 99 ? '99+' : unread }}</text>
         </view>
       </view>
     </view>
@@ -101,9 +110,12 @@
   import { computed, ref } from 'vue';
   import { clearAdminToken, fetchCsWorkbench } from '../../api/cs';
   import type { CsPerformanceRow, CsTodoItem, CsWorkbench } from '../../api/cs';
+  import { closeRealtime, realtimeUnread } from '../../api/realtime';
   import { datetime, money } from '../../utils/format';
 
   const board = ref<CsWorkbench | null>(null);
+  // 未读消息红点：由实时通道下发的服务端未读数驱动。
+  const unread = realtimeUnread;
 
   const todos = computed<CsTodoItem[]>(() => board.value?.todos || []);
   /** 业绩明细：非超管时服务端强制收敛到本人，故这里展示的就是本人业绩。 */
@@ -129,41 +141,53 @@
     }
   }
 
-  function go(url: string) {
+  // tabBar 页面只能用 switchTab（navigateTo 会静默失败），且 switchTab 不支持 query，
+  // 订单筛选状态经 storage 传递，由 orders.vue 在 onShow 消费。
+  const TAB_PATHS = ['/pages/cs/workbench', '/pages/cs/customers', '/pages/cs/orders'];
+
+  function open(url: string) {
+    const [path, search = ''] = url.split('?');
+    if (TAB_PATHS.includes(path)) {
+      const status = search.match(/status=(\w+)/)?.[1];
+      if (status) uni.setStorageSync('cs_orders_status', status);
+      uni.switchTab({ url: path });
+      return;
+    }
     uni.navigateTo({ url });
   }
 
   function goOrders(status: string) {
-    uni.navigateTo({ url: `/pages/cs/orders?status=${status}` });
+    open(`/pages/cs/orders?status=${status}`);
   }
 
   function onTodo(item: CsTodoItem) {
     switch (item.key) {
       case 'overdue_payment':
-        uni.navigateTo({ url: '/pages/cs/orders?status=pending_payment' });
+        open('/pages/cs/orders?status=pending_payment');
         break;
       case 'pending_close':
       // 结单超时待处理：订单仍停在待结单，按履约状态过滤到同一列表。
       case 'close_deadline_overdue':
-        uni.navigateTo({ url: '/pages/cs/orders?status=pending_close' });
+        open('/pages/cs/orders?status=pending_close');
         break;
       // 档期待确认待处置：该态订单仍未派单，落到待派单列表。
       case 'appointment_pending_confirm':
-        uni.navigateTo({ url: '/pages/cs/orders?status=pending_dispatch' });
+        open('/pages/cs/orders?status=pending_dispatch');
         break;
       case 'due_follow_up':
       case 'customer_birthday':
-        uni.navigateTo({ url: '/pages/cs/customers' });
+        open('/pages/cs/customers');
         break;
       case 'pending_aftersale':
-        uni.navigateTo({ url: '/pages/cs/after-sales' });
+        open('/pages/cs/after-sales');
         break;
       default:
-        uni.navigateTo({ url: '/pages/cs/orders' });
+        open('/pages/cs/orders');
     }
   }
 
   function logout() {
+    closeRealtime();
     clearAdminToken();
     uni.reLaunch({ url: '/pages/cs/login' });
   }
@@ -261,6 +285,22 @@
     flex-direction: column;
     align-items: center;
     gap: 8rpx;
+    position: relative;
+  }
+
+  .entry-badge {
+    position: absolute;
+    top: -8rpx;
+    right: 12rpx;
+    min-width: 28rpx;
+    padding: 0 8rpx;
+    height: 28rpx;
+    line-height: 28rpx;
+    text-align: center;
+    border-radius: 999rpx;
+    background: $danger;
+    color: #fff;
+    font-size: 20rpx;
   }
 
   .entry-icon {

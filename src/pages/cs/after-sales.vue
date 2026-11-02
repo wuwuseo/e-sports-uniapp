@@ -171,8 +171,8 @@
           <view class="field">来源类型：{{ sourceTypeOptions[sourceTypeIndex] }}</view>
         </picker>
         <input v-model="createForm.source_id" class="field" type="number" placeholder="来源 ID（订单 / 礼物 / 充值）" />
-        <picker :range="kindOptions" :value="kindIndex" @change="onKindChange">
-          <view class="field">问题类型：{{ kindOptions[kindIndex] }}</view>
+        <picker :range="kindLabels" :value="kindIndex" @change="onKindChange">
+          <view class="field">问题类型：{{ kindLabels[kindIndex] }}</view>
         </picker>
         <textarea v-model="createForm.demand" class="field textarea" placeholder="诉求描述（必填，≤500字）" />
         <input v-model="createForm.expected_plan" class="field" placeholder="期望方案（选填）" />
@@ -234,7 +234,7 @@
     withdrawAfterSale,
   } from '../../api/cs';
   import type { CsAfterSale, CsAfterSaleAction, CsAfterSaleMessage } from '../../api/cs';
-  import { afterSaleKindText, afterSaleStatusText, datetime, money } from '../../utils/format';
+  import { afterSaleKindText, afterSaleStatusText, afterSaleKinds, datetime, money } from '../../utils/format';
   import { pickEvidenceAttachments } from '../../utils/evidence';
 
   const tabs = [
@@ -247,7 +247,9 @@
     { label: '已完成', value: 'completed' },
   ];
   const sourceTypeOptions = ['order', 'gift', 'recharge'];
-  const kindOptions = ['service_mismatch', 'duration_short', 'no_show', 'wrong_item', 'overcharge', 'refund_request', 'other'];
+  // 问题类型：下拉展示中文 label，提交时取对应枚举 value
+  const kindLabels = afterSaleKinds.map((i) => i.label);
+  const kindOptions = afterSaleKinds.map((i) => i.value);
   const faultOptions = ['undetermined', 'player', 'admin', 'customer', 'platform', 'none'];
   const planOptions = ['refund_original', 'compensate', 'makeup_service', 'none'];
 

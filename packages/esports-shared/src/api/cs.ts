@@ -4,7 +4,7 @@
 // 业务接口为相对路径（如 /admin/cs/workbench），完整前缀 /api/v1/esports 由 API_BASE 提供，
 // 与 esports.ts 的 /products、/user/* 同源；admin 登录接口由宿主 CMF 提供，用完整路径（同 user 登录）。
 
-import { API_BASE } from './request';
+import { API_BASE, requestURL } from './request';
 import type { ApiResponse } from './request';
 
 // ── admin token 存储（与 user token 隔离） ──
@@ -51,7 +51,7 @@ export function csRequest<T>(options: CsRequestOptions): Promise<T> {
       header.Authorization = `Bearer ${token}`;
     }
     uni.request({
-      url: `${API_BASE}${options.url}`,
+      url: requestURL(options.url),
       method: options.method || 'GET',
       data: options.data,
       header,
@@ -109,7 +109,7 @@ export function uploadCsAttachment(
 ): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     uni.uploadFile({
-      url: `${API_BASE}${ADMIN_ATTACHMENT_UPLOAD_URL}`,
+      url: requestURL(ADMIN_ATTACHMENT_UPLOAD_URL),
       filePath,
       name: 'file',
       header: { Authorization: `Bearer ${getAdminToken()}` },
@@ -259,6 +259,8 @@ export interface DispatchBoard {
   public_pool: CsOrder[];
   grabbing: CsOrder[];
   pending_acceptance: CsOrder[];
+  // 陪玩已抢单、等待客户确认的订单。
+  pending_customer_confirm: CsOrder[];
   accepted: CsOrder[];
   in_service: CsOrder[];
   pending_close: CsOrder[];
@@ -1252,3 +1254,56 @@ export const fetchAdminPlayers = (keyword = '') =>
 
 export const fetchPublicCampaigns = () =>
   csRequest<CsCampaign[]>({ url: '/campaigns', auth: false });
+
+// ── 站内消息中心（CMF 核心接口，绝对路径 /api/v1/admin/auth/messages） ──
+
+/** 管理端消息列表响应：与 /api/v1/admin/auth/messages 的 ListResponse 一致。 */
+export interface CsMessageList {
+  total: number;
+  page: number;
+  data: CsMessage[];
+}
+
+/** 管理端站内消息（含广播消息），`read_at` 为空表示未读。 */
+export interface CsMessage {
+  id: number;
+  type: string;
+  level: string;
+  title: string;
+  content: string;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface CsMessageListParams {
+  page?: number;
+  page_size?: number;
+  /** 0=只看未读，1=只看已读，缺省全部。 */
+  read_status?: 0 | 1;
+}
+
+/** 客服端消息列表：分页 + 按创建时间倒序。 */
+export const fetchCsMessages = (params: CsMessageListParams = {}) => {
+  const query: string[] = ['sort=created_at_desc'];
+  if (params.page) query.push(`page=${params.page}`);
+  if (params.page_size) query.push(`page_size=${params.page_size}`);
+  if (params.read_status !== undefined) query.push(`read_status=${params.read_status}`);
+  return csRequest<CsMessageList>({
+    url: `/api/v1/admin/auth/messages?${query.join('&')}`,
+  });
+};
+
+export const markCsMessagesRead = (ids: number[]) =>
+  csRequest<{ affected: number }>({
+    url: '/api/v1/admin/auth/messages/read',
+    method: 'POST',
+    data: { ids },
+  });
+
+/** 全部已读：服务端按当前登录 uid 一键清空未读，比逐条提交加载过的 id 更完整。 */
+export const markAllCsMessagesRead = () =>
+  csRequest<{ affected: number }>({
+    url: '/api/v1/admin/auth/messages/read-all',
+    method: 'POST',
+    data: {},
+  });
