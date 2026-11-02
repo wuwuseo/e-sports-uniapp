@@ -40,13 +40,19 @@
 </template>
 
 <script setup lang="ts">
-  import { onReachBottom, onShow } from '@dcloudio/uni-app';
+  import { onHide, onReachBottom, onShow, onUnload } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
   import {
     fetchMyMessages,
     markMyMessagesRead,
   } from '../../api/esports';
   import type { EsportsMessage, MessageListParams } from '../../api/esports';
+  import {
+    onRealtime,
+    onRealtimeReconnect,
+    realtimeUnread,
+    updateRealtimeUnread,
+  } from '../../api/realtime';
   import { datetime } from '../../utils/format';
 
   const PAGE_SIZE = 30;
@@ -57,6 +63,8 @@
   const marking = ref(false);
   const failed = ref(false);
   const hasMore = ref(true);
+  /** 页面是否在前台：只有前台才在收到推送时重拉列表。 */
+  const visible = ref(false);
 
   const isUnread = (msg: EsportsMessage) => !msg.read_at;
   const unreadCount = computed(() => items.value.filter(isUnread).length);
@@ -134,6 +142,8 @@
     try {
       await markMessages([msg.id]);
       applyRead([msg.id]);
+      // 红点跟随服务端未读数：单条已读后本地减一（服务端下次推送会覆盖为精确值）。
+      updateRealtimeUnread(realtimeUnread.value - 1);
     } catch {
       // request 层已统一 toast。
     } finally {
@@ -148,6 +158,7 @@
     try {
       await markMessages(ids);
       applyRead(ids);
+      updateRealtimeUnread(realtimeUnread.value - ids.length);
       uni.showToast({ title: '已全部标为已读', icon: 'none' });
     } catch {
       // request 层已统一 toast。
@@ -156,7 +167,25 @@
     }
   }
 
-  onShow(load);
+  // 实时通道：前台收到新消息直接重拉；断线恢复后同样补拉（离线期间的消息本来就在库里）。
+  const offMessage = onRealtime('message.created', () => {
+    if (visible.value) reload();
+  });
+  const offReconnect = onRealtimeReconnect(() => {
+    if (visible.value) reload();
+  });
+
+  onShow(() => {
+    visible.value = true;
+    load();
+  });
+  onHide(() => {
+    visible.value = false;
+  });
+  onUnload(() => {
+    offMessage();
+    offReconnect();
+  });
   onReachBottom(loadMore);
 </script>
 

@@ -42,7 +42,10 @@
       </view>
       <view class="cell" @click="go('/pages/messages/index')">
         <text>消息中心</text>
-        <text class="arrow">›</text>
+        <view class="cell-right">
+          <text v-if="unread > 0" class="msg-badge">{{ unread > 99 ? '99+' : unread }}</text>
+          <text class="arrow">›</text>
+        </view>
       </view>
       <view v-if="profile?.priority_booking_enabled" class="cell" @click="go('/pages/member/priority-booking')">
         <text>会员优先预约</text>
@@ -80,9 +83,12 @@
   import { computed, ref } from 'vue';
   import { fetchProfile } from '../../api/esports';
   import type { CustomerProfile } from '../../api/esports';
+  import { closeRealtime, realtimeUnread } from '../../api/realtime';
   import { clearToken } from '../../api/request';
 
   const profile = ref<CustomerProfile | null>(null);
+  // 未读消息红点：由实时通道下发的服务端未读数驱动。
+  const unread = realtimeUnread;
 
   const remainingGrowth = computed(() => {
     if (!profile.value) return 0;
@@ -102,6 +108,7 @@
   }
 
   function logout() {
+    closeRealtime();
     clearToken();
     uni.reLaunch({ url: '/pages/login/index' });
   }
@@ -158,6 +165,24 @@
 
   .arrow {
     color: $text-3;
+  }
+
+  .cell-right {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  .msg-badge {
+    min-width: 32rpx;
+    padding: 0 10rpx;
+    height: 32rpx;
+    line-height: 32rpx;
+    text-align: center;
+    border-radius: 999rpx;
+    background: $danger;
+    color: #fff;
+    font-size: 22rpx;
   }
 
   .ghost {

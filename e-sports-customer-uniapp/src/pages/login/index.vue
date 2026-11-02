@@ -48,6 +48,7 @@
 <script setup lang="ts">
   import { reactive, ref } from 'vue';
   import { login } from '../../api/esports';
+  import { ensureRealtime } from '../../api/realtime';
   import { setToken, USER_LOGIN_PATH } from '../../api/request';
 
   const loginPath = USER_LOGIN_PATH;
@@ -80,6 +81,8 @@
         return;
       }
       setToken(token);
+      // 登录后立刻建立实时通道（幂等）；失败会在 App.onShow 再次尝试。
+      ensureRealtime();
       // 用户端没有角色分流，登录成功直接回报单首页。
       uni.reLaunch({ url: '/pages/index/index' });
     } catch {

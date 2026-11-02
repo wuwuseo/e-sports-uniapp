@@ -22,6 +22,7 @@ export const fulfillmentText = (status: string) =>
       pending_dispatch: '待派单',
       pending_acceptance: '待接单',
       grabbing: '抢单中',
+      pending_customer_confirm: '待你确认陪玩',
       accepted: '已接单',
       in_service: '服务中',
       pending_close: '待结单',

@@ -1,7 +1,26 @@
 <script setup lang="ts">
-  import { onLaunch } from '@dcloudio/uni-app';
+  import { onLaunch, onShow } from '@dcloudio/uni-app';
+  import { watch } from 'vue';
   import { getToken } from './api/request';
+  import { ensureRealtime, realtimeUnread } from './api/realtime';
   import { loadSkillLevels } from './utils/levels';
+
+  /** tabBar「我的」索引：未读消息红点跟随实时通道下发的未读数。 */
+  const MINE_TAB_INDEX = 2;
+
+  function syncUnreadBadge(value: number) {
+    if (value > 0) {
+      uni.setTabBarBadge({
+        index: MINE_TAB_INDEX,
+        text: value > 99 ? '99+' : `${value}`,
+        fail: () => {},
+      });
+      return;
+    }
+    uni.removeTabBarBadge({ index: MINE_TAB_INDEX, fail: () => {} });
+  }
+
+  watch(realtimeUnread, syncUnreadBadge, { immediate: true });
 
   /** 冷启动读取预览码：H5 hash 路由为 #/?preview=...，其它端走 launch query。 */
   function launchPreviewCode(options?: {
@@ -47,6 +66,11 @@
     if (!getToken() && !launchPreviewCode(options) && !launchPublicPay(options)) {
       uni.reLaunch({ url: '/pages/login/index' });
     }
+  });
+
+  // 回前台立即恢复实时通道：移动端切后台会掐断连接，ensureRealtime 幂等且不等退避。
+  onShow(() => {
+    ensureRealtime();
   });
 </script>
 

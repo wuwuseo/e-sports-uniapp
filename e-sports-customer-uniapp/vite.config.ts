@@ -13,6 +13,8 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:9501",
         changeOrigin: true,
+        // 实时通知走 WebSocket：代理必须升级协议，否则 H5 建连失败。
+        ws: true,
       },
       "/uploads": {
         target: "http://127.0.0.1:9501",

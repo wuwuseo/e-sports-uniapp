@@ -35,6 +35,23 @@
 	  >取消未付款订单</button>
     </view>
 
+    <!-- 抢单后待客户确认：确认即转已接单，更换则释放回抢单大厅。 -->
+    <view v-if="order.fulfillment_status === 'pending_customer_confirm'" class="card">
+      <view class="section-title">陪玩已抢单，等待你确认</view>
+      <view v-if="members.length" class="muted">
+        本次陪玩：{{ members.map((item) => item.display_name).join('、') }}
+      </view>
+      <view v-else class="muted">正在读取陪玩信息…</view>
+      <view class="muted">
+        请确认是否由该陪玩服务；超过 {{ datetime(order.customer_confirm_deadline) }} 未确认将自动确认。
+      </view>
+      <view class="actions">
+        <button class="primary" :loading="submitting" @click="confirmPlayer">确认这位陪玩</button>
+        <button class="ghost" :loading="submitting" @click="changePlayer">更换陪玩</button>
+      </view>
+      <view class="muted">更换后订单会重新放回抢单大厅，由其他陪玩接单。</view>
+    </view>
+
     <view v-if="order.fulfillment_status === 'pending_payment'" class="card">
       <view class="section-title">去付款</view>
       <view class="muted">应付 {{ money(order.payable_cents) }} · 支付时限 {{ datetime(order.payment_deadline) }}</view>
@@ -267,9 +284,11 @@
   import { computed, reactive, ref } from 'vue';
   import {
 	  cancelUnpaidOrder,
+    confirmGrabbedPlayer,
     confirmOrderQuote,
     confirmRescheduleProposal,
     createAfterSale,
+    declineGrabbedPlayer,
     fetchMyOrder,
     fetchMyRescheduleProposals,
     fetchOrderMembers,
@@ -403,7 +422,11 @@
       quote.value = null;
     }
     members.value = [];
-    if (order.value?.fulfillment_status === 'completed') {
+    // 已完成（评价用）与待客户确认（展示抢单陪玩）都需要成员姓名。
+    if (
+      order.value?.fulfillment_status === 'completed' ||
+      order.value?.fulfillment_status === 'pending_customer_confirm'
+    ) {
       try {
         members.value = (await fetchOrderMembers(orderId.value)) || [];
       } catch {
@@ -422,6 +445,34 @@
       proposals.value = [];
     }
     await refreshProofs();
+  }
+
+  // 客户确认抢单陪玩：确认后订单转已接单，等待陪玩开工。
+  async function confirmPlayer() {
+    submitting.value = true;
+    try {
+      await confirmGrabbedPlayer(orderId.value);
+      uni.showToast({ title: '已确认陪玩', icon: 'success' });
+      await load();
+    } catch {
+      // request 层已提示（订单已流转或已过确认时限）。
+    } finally {
+      submitting.value = false;
+    }
+  }
+
+  // 客户更换陪玩：释放当前席位，订单重新放回抢单大厅。
+  async function changePlayer() {
+    submitting.value = true;
+    try {
+      await declineGrabbedPlayer(orderId.value);
+      uni.showToast({ title: '已放回抢单大厅，重新匹配中', icon: 'none' });
+      await load();
+    } catch {
+      // request 层已提示（订单已流转或已过确认时限）。
+    } finally {
+      submitting.value = false;
+    }
   }
 
   async function refreshProofs() {

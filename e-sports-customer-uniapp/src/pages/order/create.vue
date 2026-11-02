@@ -23,9 +23,6 @@
         <text>预估应付</text>
         <text class="price">{{ money(estimateCents) }}</text>
       </view>
-      <view v-if="preferredPlayerId > 0" class="muted">
-        已选择陪玩 #{{ preferredPlayerId }}：下单后会以「客户指定陪玩」提交，客服按该陪玩派单。
-      </view>
       <view v-if="contentImages.length" class="content-images">
         <image
           v-for="(src, index) in contentImages"
@@ -37,6 +34,30 @@
         />
       </view>
       <view class="muted">最终金额以会员折扣与客服改价后的报价为准（下单后请确认报价）。</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">选择陪玩（可选）</view>
+      <view class="muted">
+        不选则由陪玩抢单后你来确认；选中后将作为「客户指定陪玩」提交，由客服按该陪玩派单。
+      </view>
+      <view v-if="players.length === 0" class="muted">暂无可选陪玩</view>
+      <scroll-view v-else class="player-list" scroll-y>
+        <view
+          v-for="player in players"
+          :key="player.id"
+          class="player"
+          :class="{ selected: player.id === preferredPlayerId }"
+          @click="togglePlayer(player)"
+        >
+          <text class="player-name">{{ player.display_name }}</text>
+          <text class="muted">{{ player.level }} · {{ player.online ? '在线' : '不在线' }}</text>
+        </view>
+      </scroll-view>
+      <view v-if="preferredPlayerId > 0" class="row">
+        <text class="muted">已选择：{{ preferredPlayerName }}</text>
+        <button class="mini" @click="preferredPlayerId = 0">清除</button>
+      </view>
     </view>
 
     <view class="card">
@@ -53,14 +74,34 @@
 <script setup lang="ts">
   import { onLoad } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
-  import { fetchSkus, placeSelfOrder } from '../../api/esports';
-  import type { Sku } from '../../api/esports';
+  import { fetchRecommendedPlayers, fetchSkus, placeSelfOrder } from '../../api/esports';
+  import type { RecommendedPlayer, Sku } from '../../api/esports';
   import { idempotencyKey, money } from '../../utils/format';
 
   const skuId = ref(0);
   const sku = ref<Sku | null>(null);
-  /** 首页陪玩推荐卡片的「立即下单」带入的指定陪玩，0 表示不指定。 */
+  /** 客户指定陪玩：首页推荐卡带入或在本页选择，0 表示不指定、走抢单。 */
   const preferredPlayerId = ref(0);
+  /** 可选陪玩：复用公开陪玩列表（资质合格 + 在线）。 */
+  const players = ref<RecommendedPlayer[]>([]);
+  const selectedPlayer = computed(
+    () => players.value.find((item) => item.id === preferredPlayerId.value) || null
+  );
+  const preferredPlayerName = computed(() =>
+    selectedPlayer.value?.display_name || (preferredPlayerId.value > 0 ? `#${preferredPlayerId.value}` : '')
+  );
+
+  async function loadPlayers() {
+    try {
+      players.value = (await fetchRecommendedPlayers()) || [];
+    } catch {
+      players.value = [];
+    }
+  }
+
+  function togglePlayer(player: RecommendedPlayer) {
+    preferredPlayerId.value = preferredPlayerId.value === player.id ? 0 : player.id;
+  }
   const quantity = ref(1);
   const quantityText = ref('1');
   const submitting = ref(false);
@@ -133,6 +174,7 @@
     skuId.value = Number(query?.skuId || 0);
     preferredPlayerId.value = Number(query?.playerId || 0) || 0;
     loadSku();
+    loadPlayers();
   });
 </script>
 
@@ -154,6 +196,27 @@
     width: 100%;
     border-radius: 12rpx;
     background-color: #f2f3f5;
+  }
+
+  .player-list {
+    max-height: 420rpx;
+    margin-top: 12rpx;
+  }
+
+  .player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16rpx 12rpx;
+    border-radius: $radius;
+
+    &.selected {
+      background: $bg;
+    }
+  }
+
+  .player-name {
+    font-weight: 600;
   }
 
   .stepper {
