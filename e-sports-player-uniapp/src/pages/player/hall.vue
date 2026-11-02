@@ -67,10 +67,11 @@
 </template>
 
 <script setup lang="ts">
-  import { onShow } from '@dcloudio/uni-app';
+  import { onHide, onShow, onUnload } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
   import { fetchGrabHall, grabOrder } from '../../api/player';
   import type { PlayerOrder } from '../../api/player';
+  import { onRealtime, onRealtimeReconnect } from '../../api/realtime';
   import { datetime, divideCents, money, yuanToCents } from '../../utils/format';
 
   import { skillLevelText, skillLevelRank } from '../../utils/levels';
@@ -196,7 +197,38 @@
     }
   }
 
-  onShow(load);
+  /** 页面是否在前台：只有前台才响应大厅推送。 */
+  const visible = ref(false);
+  let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** 大厅新单：300ms 防抖后重拉，结果以 listGrabHall 接口为准（服务端不做收件人过滤）。 */
+  function scheduleReload() {
+    if (reloadTimer) clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      reloadTimer = null;
+      load();
+    }, 300);
+  }
+
+  const offHall = onRealtime('hall.order_created', () => {
+    if (visible.value) scheduleReload();
+  });
+  const offReconnect = onRealtimeReconnect(() => {
+    if (visible.value) load();
+  });
+
+  onShow(() => {
+    visible.value = true;
+    load();
+  });
+  onHide(() => {
+    visible.value = false;
+  });
+  onUnload(() => {
+    offHall();
+    offReconnect();
+    if (reloadTimer) clearTimeout(reloadTimer);
+  });
 </script>
 
 <style scoped lang="scss">

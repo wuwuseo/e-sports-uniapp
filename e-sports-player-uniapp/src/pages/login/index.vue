@@ -49,6 +49,7 @@
   import { reactive, ref } from 'vue';
   import { login } from '../../api/esports';
   import { fetchPlayerDashboard } from '../../api/player';
+  import { ensureRealtime } from '../../api/realtime';
   import { clearToken, setToken, USER_LOGIN_PATH } from '../../api/request';
 
   const loginPath = USER_LOGIN_PATH;
@@ -84,6 +85,8 @@
       // 陪玩端硬性校验陪玩身份：探测失败即清登录态，留在登录页。
       try {
         await fetchPlayerDashboard(false);
+        // 陪玩身份确认后立刻建立实时通道（幂等）；失败会在 App.onShow 再次尝试。
+        ensureRealtime();
         uni.reLaunch({ url: '/pages/player/home' });
       } catch {
         clearToken();

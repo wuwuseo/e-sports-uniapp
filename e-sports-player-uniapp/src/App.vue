@@ -1,6 +1,8 @@
 <script setup lang="ts">
   import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
+  import { watch } from 'vue';
   import { getToken } from './api/request';
+  import { ensureRealtime, realtimeUnread } from './api/realtime';
   import { loadSkillLevels } from './utils/levels';
   import {
     enterPlayerMode,
@@ -8,6 +10,23 @@
     startPlayerHeartbeat,
     stopAllPlayerHeartbeat,
   } from './api/player';
+
+  /** tabBar「我的」索引：未读消息红点跟随实时通道下发的未读数。 */
+  const MINE_TAB_INDEX = 2;
+
+  function syncUnreadBadge(value: number) {
+    if (value > 0) {
+      uni.setTabBarBadge({
+        index: MINE_TAB_INDEX,
+        text: value > 99 ? '99+' : `${value}`,
+        fail: () => {},
+      });
+      return;
+    }
+    uni.removeTabBarBadge({ index: MINE_TAB_INDEX, fail: () => {} });
+  }
+
+  watch(realtimeUnread, syncUnreadBadge, { immediate: true });
 
   /** 应用前台心跳持有者标识（页面级 page 持有者另算）。 */
   const FOREGROUND: 'foreground' = 'foreground';
@@ -34,7 +53,8 @@
   // 前台生命周期：回到前台时恢复陪玩心跳（页面间切换不会触发 onShow/onHide）。
   onShow(() => {
     inForeground = true;
-
+    // 回前台立即恢复实时通道（陪玩端的优先通知 / 大厅新单都靠它；不等退避）。
+    ensureRealtime();
     // 停在陪玩页则补记身份；否则仅在已确认陪玩身份时恢复心跳。
     function syncForegroundHeartbeat() {
       if (!inForeground) return;

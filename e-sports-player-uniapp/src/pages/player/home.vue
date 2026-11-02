@@ -51,6 +51,11 @@
           <text class="entry-icon">钟</text>
           <text class="entry-text">加钟通知</text>
         </view>
+        <view class="entry" @click="go('/pages/player/messages')">
+          <text class="entry-icon">信</text>
+          <text class="entry-text">消息</text>
+          <text v-if="unread > 0" class="entry-badge">{{ unread > 99 ? '99+' : unread }}</text>
+        </view>
         <view class="entry" @click="go('/pages/player/notices')">
           <text class="entry-icon">先</text>
           <text class="entry-text">优先通知</text>
@@ -98,7 +103,11 @@
   import type { PlayerDashboard, PlayerInvite } from '../../api/player';
   import { fetchWalletDisplay, walletUnitAmount } from '../../api/esports';
   import type { WalletDisplay } from '../../api/esports';
+  import { realtimeUnread } from '../../api/realtime';
   import { datetime, money } from '../../utils/format';
+
+  // 未读消息红点：由实时通道下发的服务端未读数驱动。
+  const unread = realtimeUnread;
 
   // 陪玩猫粮的展示口径：接口未返回时回落「猫粮 / ¥」旧文案。
   type PlayerDashboardView = PlayerDashboard & { display?: WalletDisplay };
@@ -252,6 +261,22 @@
     flex-direction: column;
     align-items: center;
     gap: 8rpx;
+    position: relative;
+  }
+
+  .entry-badge {
+    position: absolute;
+    top: -8rpx;
+    right: 12rpx;
+    min-width: 28rpx;
+    padding: 0 8rpx;
+    height: 28rpx;
+    line-height: 28rpx;
+    text-align: center;
+    border-radius: 999rpx;
+    background: $danger;
+    color: #fff;
+    font-size: 20rpx;
   }
 
   .entry-icon {

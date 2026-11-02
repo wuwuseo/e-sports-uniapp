@@ -21,6 +21,10 @@
       "style": { "navigationBarTitleText": "加钟通知" }
     },
     {
+      "path": "pages/player/messages",
+      "style": { "navigationBarTitleText": "消息中心" }
+    },
+    {
       "path": "pages/player/notices",
       "style": { "navigationBarTitleText": "优先通知" }
     },

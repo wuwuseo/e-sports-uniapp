@@ -179,6 +179,7 @@
     updatePlayerProfile,
   } from '../../api/player';
   import type { PlayerProfile } from '../../api/player';
+  import { closeRealtime } from '../../api/realtime';
   import { clearToken } from '../../api/request';
   import { datetime, money, yuanToCents } from '../../utils/format';
 
@@ -342,9 +343,10 @@
       content: '确定要退出当前账号吗？',
       success: (res) => {
         if (res.confirm) {
-          // 登出即身份切换：强制停表并清陪玩标记，避免残留前台心跳。
+          // 登出即身份切换：停表、清陪玩标记并断开实时通道，避免残留心跳与推送。
           stopAllPlayerHeartbeat();
           clearPlayerMode();
+          closeRealtime();
           clearToken();
           uni.reLaunch({ url: '/pages/login/index' });
         }
