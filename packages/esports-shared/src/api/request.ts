@@ -80,7 +80,7 @@ export function clearToken() {
  * 业务接口（/page、/players 等）拼完整 API 基址；
  * 登录 / 附件等以 /api/ 开头的绝对路径只拼 origin，避免重复 /api/v1/esports。
  */
-function requestURL(url: string): string {
+export function requestURL(url: string): string {
   const base = API_BASE.replace(/\/+$/, '');
   if (url.startsWith('/api/')) {
     return `${base.replace(/\/api\/v1\/esports$/, '')}${url}`;

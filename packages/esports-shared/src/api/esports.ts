@@ -9,6 +9,7 @@ export type FulfillmentStatus =
   | 'pending_dispatch'
   | 'pending_acceptance'
   | 'grabbing'
+  | 'pending_customer_confirm'
   | 'accepted'
   | 'in_service'
   | 'pending_close'
@@ -44,6 +45,8 @@ export interface Order {
   payment_status: string;
   payment_channel: string;
   fulfillment_status: FulfillmentStatus;
+  /** 抢单成功后等待客户确认的截止时间；超时后系统自动确认。 */
+  customer_confirm_deadline?: string | null;
   refund_status: string;
   refunded_cents: number;
   addon_cents: number;

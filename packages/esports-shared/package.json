@@ -8,6 +8,7 @@
     "./api/request": "./src/api/request.ts",
     "./api/esports": "./src/api/esports.ts",
     "./api/player": "./src/api/player.ts",
+    "./api/realtime": "./src/api/realtime.ts",
     "./api/cs": "./src/api/cs.ts",
     "./api/upload": "./src/api/upload.ts",
     "./api/cs.close-evidence.contract": "./src/api/cs.close-evidence.contract.ts",
