@@ -179,7 +179,7 @@
     updatePlayerProfile,
   } from '../../api/player';
   import type { PlayerProfile } from '../../api/player';
-  import { closeRealtime } from '../../api/realtime';
+  import { closeRealtime, realtimeUnread } from '../../api/realtime';
   import { clearToken } from '../../api/request';
   import { datetime, money, yuanToCents } from '../../utils/format';
 
@@ -366,7 +366,26 @@
       }) as Record<string, string>
     )[q || ''] || q || '未知';
 
+  /** tabBar「我的」索引：回到本页时按实时未读数校正徽标。 */
+  const MINE_TAB_INDEX = 2;
+
+  // 非 tab 页（如消息页）里调用 tabBar 徽标 API 在 H5 下会被忽略，
+  // 标记已读后徽标会滞留旧值，因此每次回到 tab 页都按 ref 校正一次。
+  function syncUnreadBadge() {
+    const value = realtimeUnread.value;
+    if (value > 0) {
+      uni.setTabBarBadge({
+        index: MINE_TAB_INDEX,
+        text: value > 99 ? '99+' : `${value}`,
+        fail: () => {},
+      });
+      return;
+    }
+    uni.removeTabBarBadge({ index: MINE_TAB_INDEX, fail: () => {} });
+  }
+
   onShow(() => {
+    syncUnreadBadge();
     // 进入陪玩页即确认陪玩身份，保证应用前台心跳已启动（页面切换不受影响）。
     enterPlayerMode();
     load();
