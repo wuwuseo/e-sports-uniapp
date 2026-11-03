@@ -101,7 +101,12 @@
     stopPlayerHeartbeat,
   } from '../../api/player';
   import type { PlayerDashboard, PlayerInvite } from '../../api/player';
-  import { fetchWalletDisplay, walletUnitAmount } from '../../api/esports';
+  import {
+    fetchWalletDisplay,
+    getWalletDisplayState,
+    rememberWalletDisplay,
+    walletUnitAmount,
+  } from '../../api/esports';
   import type { WalletDisplay } from '../../api/esports';
   import { realtimeUnread } from '../../api/realtime';
   import { datetime, money } from '../../utils/format';
@@ -115,7 +120,8 @@
   const dash = ref<PlayerDashboardView | null>(null);
   const invites = ref<PlayerInvite[]>([]);
   const online = ref(false);
-  const catfoodDisplay = ref<WalletDisplay | null>(null);
+  const walletDisplays = getWalletDisplayState();
+  const catfoodDisplay = computed(() => walletDisplays.value.player_catfood);
 
   const catfoodName = computed(() => catfoodDisplay.value?.display_name || '猫粮');
 
@@ -139,14 +145,8 @@
     } catch {
       invites.value = [];
     }
-    // 优先用概览接口内嵌的 display，其次读展示口径接口；都取不到则回落旧文案。
-    let fallback: WalletDisplay | null = null;
-    try {
-      fallback = (await fetchWalletDisplay())?.player_catfood || null;
-    } catch {
-      fallback = null;
-    }
-    catfoodDisplay.value = dash.value?.display || fallback;
+    rememberWalletDisplay('player_catfood', dash.value?.display);
+    await fetchWalletDisplay();
   }
 
   async function togglePresence(e: Event) {

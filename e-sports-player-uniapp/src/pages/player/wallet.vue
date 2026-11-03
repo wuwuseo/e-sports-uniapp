@@ -165,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-  import { onShow } from '@dcloudio/uni-app';
+  import { onHide, onReady, onShow } from '@dcloudio/uni-app';
   import { computed, reactive, ref } from 'vue';
   import {
     applyWithdrawal,
@@ -186,7 +186,13 @@
     Withdrawal,
     WithdrawalSummary,
   } from '../../api/player';
-  import { fetchWalletDisplay, walletPrimaryAmount, walletUnitAmount } from '../../api/esports';
+  import {
+    fetchWalletDisplay,
+    getWalletDisplayState,
+    rememberWalletDisplay,
+    walletPrimaryAmount,
+    walletUnitAmount,
+  } from '../../api/esports';
   import type { WalletDisplay } from '../../api/esports';
   import { datetime, idempotencyKey, money, yuanToCents } from '../../utils/format';
 
@@ -219,7 +225,8 @@
   const giftPeriod = ref('daily');
   const giftView = ref<PlayerGiftRecordView | null>(null);
   // 陪玩猫粮的展示口径：接口未返回时回落「猫粮 / 已结算收入 / ¥」旧文案。
-  const catfoodDisplay = ref<WalletDisplay | null>(null);
+  const walletDisplays = getWalletDisplayState();
+  const catfoodDisplay = computed(() => walletDisplays.value.player_catfood);
   const withdrawForm = reactive({
     amount: '',
     channel: 'bank_card',
@@ -364,16 +371,10 @@
     } catch {
       giftView.value = null;
     }
-    // 展示口径：概览接口内嵌的 display 优先，其次读展示口径接口，都取不到则回落旧文案。
-    let fallback: WalletDisplay | null = null;
-    try {
-      fallback = (await fetchWalletDisplay())?.player_catfood || null;
-    } catch {
-      fallback = null;
-    }
-    const embedded = (wdSummary.value as (WithdrawalSummary & { display?: WalletDisplay }) | null)
-      ?.display;
-    catfoodDisplay.value = embedded || fallback;
+    const embedded = (wdSummary.value as (WithdrawalSummary & { display?: WalletDisplay }) | null)?.display;
+    rememberWalletDisplay('player_catfood', embedded);
+    await fetchWalletDisplay();
+    if (pageVisible) updateWalletTitle();
     // 未开通的渠道不选中：选中项失效时回落到第一个可用渠道。
     const available = channels.value;
     if (available.length && !available.some((c) => c.key === withdrawForm.channel)) {
@@ -469,7 +470,14 @@
       }) as Record<string, string>
     )[status] || status;
 
+  let pageVisible = false;
+  const updateWalletTitle = () => uni.setNavigationBarTitle({ title: `${catfoodName.value}钱包` });
+  onReady(updateWalletTitle);
+  onHide(() => {
+    pageVisible = false;
+  });
   onShow(() => {
+    pageVisible = true;
     load();
     // 签约回跳：load 已重新拉取账户列表，这里只按 URL 的 payout_sign 参数提示结果。
     const flag = payoutSignReturn();

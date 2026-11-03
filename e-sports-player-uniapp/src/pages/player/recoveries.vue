@@ -1,6 +1,6 @@
 <template>
   <view>
-    <view class="card tip muted">追偿是售后赔付由陪玩承担时从猫粮余额扣回的款项，与「退款冲回分成」相互独立。</view>
+    <view class="card tip muted">追偿是售后赔付由陪玩承担时从{{ catfoodName }}余额扣回的款项，与「退款冲回分成」相互独立。</view>
 
     <view class="card">
       <view class="section-title">追偿明细</view>
@@ -49,7 +49,10 @@
 
 <script setup lang="ts">
   import { onShow } from '@dcloudio/uni-app';
-  import { ref } from 'vue';
+  import { computed, ref } from 'vue';
+  import { fetchWalletDisplay, getWalletDisplayState } from '../../api/esports';
+  const walletDisplays = getWalletDisplayState();
+  const catfoodName = computed(() => walletDisplays.value.player_catfood.display_name);
   import { fetchPlayerCreditEvents, fetchPlayerRecoveries } from '../../api/player';
   import type { PlayerCreditEvent, PlayerRecovery } from '../../api/player';
   import { datetime, money } from '../../utils/format';
@@ -58,6 +61,7 @@
   const credits = ref<PlayerCreditEvent[]>([]);
 
   async function load() {
+    await fetchWalletDisplay();
     try {
       items.value = (await fetchPlayerRecoveries()) || [];
     } catch {

@@ -4,6 +4,14 @@ import uni from "@dcloudio/vite-plugin-uni";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [uni()],
+  // 共享包以源码加载，新增导出后无需清理旧的预构建副本。
+  optimizeDeps: {
+    exclude: [
+      "@esports/shared",
+      "@esports/shared/api/esports",
+      "@esports/shared/api/cs",
+    ],
+  },
   server: {
     // 陪玩端固定 5175，端口被占用时直接报错而不是悄悄换端口
     port: 5175,
