@@ -1,6 +1,27 @@
 // 客户自助端接口封装：与服务端 `internal/apps/esports` 的 /user/* 与公开接口一一对应。
 
-import { request } from './request';
+import { API_BASE, getToken, request } from "./request";
+import { createWalletDisplayCache } from "../utils/wallet-display";
+import type { WalletDisplay, WalletDisplayMap } from "../utils/wallet-display";
+export {
+  walletPrimaryAmount,
+  walletUnitAmount,
+  walletAmountText,
+} from "../utils/wallet-display";
+export type { WalletDisplay, WalletDisplayMap } from "../utils/wallet-display";
+
+const walletDisplayCache = createWalletDisplayCache({
+  getItem: (key) => uni.getStorageSync(key) || null,
+  setItem: (key, value) => uni.setStorageSync(key, value),
+  removeItem: (key) => uni.removeStorageSync(key),
+});
+const walletScope = () => `${API_BASE}:user`;
+export const getWalletDisplayState = () =>
+  walletDisplayCache.state(walletScope());
+export const rememberWalletDisplay = (
+  type: "customer_balance" | "player_catfood",
+  display?: WalletDisplay
+) => walletDisplayCache.remember(walletScope(), type, display);
 
 // ── 类型（仅取客户端展示所需字段） ──
 
@@ -87,21 +108,6 @@ export interface CustomerProfile {
   risk_reason: string;
 }
 
-/** 钱包展示口径（服务端 `app.esports.wallet_display`，）：工作室可配的名称 / 图标 / 说明 / 单位与固定倍率。 */
-export interface WalletDisplay {
-  display_name?: string;
-  icon?: string;
-  description?: string;
-  unit_name?: string;
-  /** 每展示单位对应多少分（固定倍率）；缺省按 100 处理。 */
-  unit_cents?: number;
-  /** 服务端按 unit_cents 换算好的最终展示值（两位小数）；仅账户视图下发，纯配置接口不含。 */
-  display_amount?: string;
-}
-
-/** 按账户类型索引的展示口径。 */
-export type WalletDisplayMap = Partial<Record<'customer_balance' | 'player_catfood', WalletDisplay>>;
-
 export interface CustomerWallet {
   principal_cents: number;
   bonus_cents: number;
@@ -109,28 +115,6 @@ export interface CustomerWallet {
   /** 服务端内嵌的展示口径：接口未返回时按固定文案回落。 */
   display?: WalletDisplay;
 }
-
-/**
- * 分 → 展示单位数量（两位小数）：按 unit_cents 换算一次，缺省 100（元）。
- * 用于没有服务端 display_amount 的分项金额（本金 / 赠送 / 待结算等）。
- */
-export const walletUnitAmount = (
-  cents: number | null | undefined,
-  display?: WalletDisplay | null,
-) => {
-  const value = Number(cents ?? 0);
-  const unit = display?.unit_cents && display.unit_cents > 0 ? display.unit_cents : 100;
-  return (value / unit).toFixed(2);
-};
-
-/**
- * 主金额文案：优先用服务端按 unit_cents 换算好的 display_amount（对应账户总余额，直接展示、不再换算），
- * 缺失时才用 walletUnitAmount 换算一次。两者都拿不到配置时回落到 ¥ 分转元。
- */
-export const walletPrimaryAmount = (
-  cents: number | null | undefined,
-  display?: WalletDisplay | null,
-) => (display?.display_amount ? display.display_amount : walletUnitAmount(cents, display));
 
 export interface OrderMember {
   player_id: number;
@@ -546,8 +530,18 @@ export const fetchWallet = () => request<CustomerWallet>({ url: '/user/wallets' 
  * 钱包展示口径（名称 / 图标 / 说明 / 单位 / 倍率），客户与陪玩端共用。
  * 取不到时由页面回落到旧文案，故不弹错误提示。
  */
-export const fetchWalletDisplay = () =>
-  request<WalletDisplayMap>({ url: '/user/wallets/display', toast: false });
+export const fetchWalletDisplay = (force = false) =>
+  walletDisplayCache.load(
+    walletScope(),
+    () => request<WalletDisplayMap>({
+      url: '/wallets/display', auth: false, toast: false,
+    }).catch((error) => {
+      // 兼容旧服务端，未登录时不调用旧的受保护接口。
+      if (!getToken()) throw error;
+      return request<WalletDisplayMap>({ url: '/user/wallets/display', toast: false });
+    }),
+    force,
+  );
 
 // ── 自助充值 ──
 

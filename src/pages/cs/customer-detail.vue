@@ -21,8 +21,8 @@
       <view class="section-title">消费汇总</view>
       <view class="grid">
         <view class="stat">
-          <view class="stat-num">{{ money(overview?.balance_cents) }}</view>
-          <view class="muted">余额</view>
+          <view class="stat-num">{{ walletAmountText(overview?.balance_cents, balanceDisplay) }}</view>
+          <view class="muted">{{ balanceDisplay.display_name }}</view>
         </view>
         <view class="stat">
           <view class="stat-num">{{ money(overview?.recharged_cents) }}</view>
@@ -99,15 +99,21 @@
 
 <script setup lang="ts">
   import { onLoad, onShow } from '@dcloudio/uni-app';
-  import { reactive, ref } from 'vue';
+  import { computed, reactive, ref } from 'vue';
   import {
     createCustomerFollowUp,
     fetchCustomerFollowUps,
     fetchCustomerProfile,
+    fetchCsWalletDisplay,
+    getCsWalletDisplayState,
     updateCustomerProfile,
   } from '../../api/cs';
   import type { CustomerFollowUp, CustomerProfileOverview } from '../../api/cs';
   import { datetime, money } from '../../utils/format';
+  import { walletAmountText } from '../../api/esports';
+
+  const walletDisplays = getCsWalletDisplayState();
+  const balanceDisplay = computed(() => walletDisplays.value.customer_balance);
 
   const channelOptions = ['pc', 'mobile', 'wecom', 'phone', 'other'];
   const followOptions = ['new', 'following', 'pending', 'dormant', 'closed'];
@@ -166,6 +172,7 @@
     if (!id.value) return;
     try {
       overview.value = await fetchCustomerProfile(id.value);
+      if (!overview.value.balance_display) await fetchCsWalletDisplay();
       // 回填编辑表单
       profileForm.phone = overview.value.customer.phone || '';
       profileForm.birthday = overview.value.customer.birthday || '';

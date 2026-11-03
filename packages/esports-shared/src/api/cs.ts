@@ -4,8 +4,26 @@
 // 业务接口为相对路径（如 /admin/cs/workbench），完整前缀 /api/v1/esports 由 API_BASE 提供，
 // 与 esports.ts 的 /products、/user/* 同源；admin 登录接口由宿主 CMF 提供，用完整路径（同 user 登录）。
 
-import { API_BASE, requestURL } from './request';
-import type { ApiResponse } from './request';
+import { API_BASE, requestURL } from "./request";
+import type { ApiResponse } from "./request";
+import { createWalletDisplayCache } from "../utils/wallet-display";
+import type { WalletDisplay, WalletDisplayMap } from "../utils/wallet-display";
+
+const walletDisplayCache = createWalletDisplayCache({
+  getItem: (key) => uni.getStorageSync(key) || null,
+  setItem: (key, value) => uni.setStorageSync(key, value),
+  removeItem: (key) => uni.removeStorageSync(key),
+});
+const walletScope = () => `${API_BASE}:admin`;
+export const getCsWalletDisplayState = () =>
+  walletDisplayCache.state(walletScope());
+export const fetchCsWalletDisplay = (force = false) =>
+  walletDisplayCache.load(
+    walletScope(),
+    () => csRequest<WalletDisplayMap>({ url: '/wallets/display', auth: false, toast: false })
+      .catch(() => csRequest<WalletDisplayMap>({ url: '/admin/wallets/display', toast: false })),
+    force,
+  );
 
 // ── admin token 存储（与 user token 隔离） ──
 
@@ -310,6 +328,7 @@ export interface CsCustomer {
 }
 
 export interface CustomerProfileOverview {
+  balance_display?: WalletDisplay;
   customer: CsCustomer;
   principal_cents: number;
   bonus_cents: number;
@@ -501,8 +520,17 @@ export const fetchCsWorkbench = () =>
 export const fetchCsCustomers = () =>
   csRequest<CsCustomer[]>({ url: '/admin/customers' });
 
-export const fetchCustomerProfile = (id: number) =>
-  csRequest<CustomerProfileOverview>({ url: `/admin/customers/${id}/profile` });
+export const fetchCustomerProfile = async (id: number) => {
+  const profile = await csRequest<CustomerProfileOverview>({
+    url: `/admin/customers/${id}/profile`,
+  });
+  walletDisplayCache.remember(
+    walletScope(),
+    "customer_balance",
+    profile.balance_display
+  );
+  return profile;
+};
 
 /** 客户会员详情：当前等级、折扣、累计成长值与待降级信息。 */
 export const fetchCustomerMember = (id: number) =>
