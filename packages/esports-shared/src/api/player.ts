@@ -456,6 +456,8 @@ export interface PlayerProfile {
   presence: string;
   level: string;
   level_appraised_at: string | null;
+  /** 分区 → 等级；接单等级以它为准，level 只是所有分区里的最高档展示值。 */
+  game_levels: Record<string, string>;
   daily_limit: number;
   concurrent_limit: number;
   games: string[];
