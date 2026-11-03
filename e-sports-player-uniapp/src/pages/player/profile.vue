@@ -85,6 +85,10 @@
         <text class="label">最近定级</text>
         <text class="value">{{ datetime(profile?.level_appraised_at) }}</text>
       </view>
+      <view class="info-row">
+        <text class="label">分区等级</text>
+        <text class="value">{{ gameLevelsText }}</text>
+      </view>
     </view>
 
     <view class="card">
@@ -356,6 +360,13 @@
 
   // 技能等级文案走系统配置，App 启动时已拉取。
   const levelText = (level?: string) => skillLevelText(level) || '未定级';
+
+  // 分区等级：接单等级以分区为准，这里按「分区 等级名」逐项展示。
+  const gameLevelsText = computed(() => {
+    const entries = Object.entries(profile.value?.game_levels || {});
+    if (entries.length === 0) return '未定级';
+    return entries.map(([game, level]) => `${game} ${skillLevelText(level)}`).join(' / ');
+  });
 
   const qualificationText = (q?: string) =>
     (
