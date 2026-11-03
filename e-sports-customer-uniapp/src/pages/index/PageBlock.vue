@@ -201,8 +201,8 @@
     @click="go('/pages/wallet/index')"
   >
     <view>
-      <view class="member-title">{{ componentTitle(comp, '会员与余额') }}</view>
-      <view class="muted">查看余额与会员权益</view>
+      <view class="member-title">{{ componentTitle(comp, `会员与${balanceName}`) }}</view>
+      <view class="muted">查看{{ balanceName }}与会员权益</view>
     </view>
     <text class="arrow">›</text>
   </view>
@@ -240,7 +240,12 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, inject } from 'vue';
+  import { computed, inject, onMounted } from 'vue';
+  import { fetchWalletDisplay, getWalletDisplayState } from '../../api/esports';
+
+  const walletDisplays = getWalletDisplayState();
+  const balanceName = computed(() => walletDisplays.value.customer_balance.display_name);
+  onMounted(() => { fetchWalletDisplay(); });
   import type { Ref } from 'vue';
   import type {
     CampaignView,

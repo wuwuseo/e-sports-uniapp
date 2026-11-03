@@ -22,6 +22,7 @@
   import { computed, provide, ref } from 'vue';
   import {
     fetchActiveCampaigns,
+    fetchWalletDisplay,
     fetchPageConfig,
     fetchPagePreview,
     fetchRecommendedPlayers,
@@ -370,6 +371,7 @@
   });
 
   onShow(() => {
+    fetchWalletDisplay();
     // 先读装修配置，再按每块组件的 props 分别取数（loadConfig 内部触发 loadComponentData）。
     loadConfig();
   });

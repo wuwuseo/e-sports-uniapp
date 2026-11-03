@@ -45,7 +45,7 @@
       <radio-group @change="onPaymentSourceChange">
         <label class="radio-row">
           <radio value="customer_balance_principal" :checked="paymentSource === 'customer_balance_principal'" />
-          <text>客户余额本金（可用 {{ money(wallet?.principal_cents || 0) }}）</text>
+          <text>{{ balanceName }}本金（可用 {{ walletAmountText(wallet?.principal_cents, balanceDisplay) }}）</text>
         </label>
       </radio-group>
 
@@ -61,7 +61,7 @@
       <view class="row"><text>数量</text><text>{{ intent.quantity }}</text></view>
       <view class="row"><text>单价</text><text>{{ money(intent.unit_price_cents) }}</text></view>
       <view class="row"><text>合计</text><text>{{ money(intent.amount_cents) }}</text></view>
-      <view class="row"><text>支付来源</text><text>客户余额本金</text></view>
+      <view class="row"><text>支付来源</text><text>{{ balanceName }}本金</text></view>
       <view v-if="intent.order_id" class="row"><text>关联订单</text><text>{{ intent.order_id }}</text></view>
       <view class="row"><text>确认状态</text><text>{{ statusText(intent.status) }}</text></view>
       <view class="muted">有效期至 {{ datetime(intent.expires_at) }}</view>
@@ -86,6 +86,10 @@ import {
   fetchMyGiftIntents,
   fetchRecommendedPlayers,
   fetchWallet,
+  fetchWalletDisplay,
+  getWalletDisplayState,
+  rememberWalletDisplay,
+  walletAmountText,
 } from '../../api/esports';
 import type {
   CustomerWallet,
@@ -105,6 +109,9 @@ const savingId = ref(0);
 const gifts = ref<GiftCatalogItem[]>([]);
 const players = ref<RecommendedPlayer[]>([]);
 const wallet = ref<CustomerWallet | null>(null);
+const walletDisplays = getWalletDisplayState();
+const balanceDisplay = computed(() => walletDisplays.value.customer_balance);
+const balanceName = computed(() => balanceDisplay.value.display_name);
 const giftIndex = ref(-1);
 const playerIndex = ref(-1);
 const quantityText = ref('1');
@@ -174,6 +181,7 @@ async function loadForm() {
     gifts.value = catalog || [];
     players.value = playerList || [];
     wallet.value = w || null;
+    rememberWalletDisplay('customer_balance', w?.display);
   } catch {
     // 表单依赖的公开/登录接口失败时保持空列表，提交时由后端再次校验。
   }
@@ -186,7 +194,7 @@ function applyPresetPlayer(playerId: number) {
 
 async function confirm(intent: GiftIntent) {
   const result = await new Promise<boolean>((resolve) => {
-    uni.showModal({ title: '确认礼物', content: `向 ${intent.player_name} 赠送 ${intent.gift_name} × ${intent.quantity}，将从客户余额本金扣除 ${money(intent.amount_cents)}。`,
+    uni.showModal({ title: '确认礼物', content: `向 ${intent.player_name} 赠送 ${intent.gift_name} × ${intent.quantity}，将从${balanceName.value}本金扣除 ${walletAmountText(intent.amount_cents, balanceDisplay.value)}。`,
       confirmText: '确认授权', success: (res) => resolve(res.confirm), fail: () => resolve(false) });
   });
   if (!result) return;
@@ -271,7 +279,7 @@ onLoad((query) => {
   });
 });
 
-onShow(load);
+onShow(() => { fetchWalletDisplay(); load(); });
 </script>
 
 <style scoped lang="scss">

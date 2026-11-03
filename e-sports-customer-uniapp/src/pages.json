@@ -38,7 +38,7 @@
     },
     {
       "path": "pages/wallet/index",
-      "style": { "navigationBarTitleText": "余额与权益" }
+      "style": { "navigationBarTitleText": "钱包" }
     },
     {
       "path": "pages/wallet/recharge",

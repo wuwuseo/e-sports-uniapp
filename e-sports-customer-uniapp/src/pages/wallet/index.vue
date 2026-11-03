@@ -31,20 +31,23 @@
 </template>
 
 <script setup lang="ts">
-  import { onShow } from '@dcloudio/uni-app';
+  import { onHide, onReady, onShow } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
   import {
     fetchWallet,
     fetchWalletDisplay,
+    getWalletDisplayState,
+    rememberWalletDisplay,
     walletPrimaryAmount,
     walletUnitAmount,
   } from '../../api/esports';
-  import type { CustomerWallet, WalletDisplay } from '../../api/esports';
+  import type { CustomerWallet } from '../../api/esports';
   import { money } from '../../utils/format';
 
   const wallet = ref<CustomerWallet | null>(null);
   // 服务端展示口径：取不到时全部回落到旧文案「余额 / 元」。
-  const walletDisplay = ref<WalletDisplay | null>(null);
+  const walletDisplays = getWalletDisplayState();
+  const walletDisplay = computed(() => walletDisplays.value.customer_balance);
 
   const balanceTitle = computed(() => walletDisplay.value?.display_name || '可用余额（本金 + 赠送）');
   const balanceDescription = computed(() => walletDisplay.value?.description || '');
@@ -86,17 +89,16 @@
     } catch {
       wallet.value = null;
     }
-    // 优先用钱包接口内嵌的 display；接口未带时读展示口径接口；都取不到则回落旧文案。
-    let fallback: WalletDisplay | null = null;
-    try {
-      fallback = (await fetchWalletDisplay())?.customer_balance || null;
-    } catch {
-      fallback = null;
-    }
-    walletDisplay.value = wallet.value?.display || fallback;
+    rememberWalletDisplay('customer_balance', wallet.value?.display);
+    await fetchWalletDisplay();
+    if (pageVisible) updateWalletTitle();
   }
 
-  onShow(load);
+  let pageVisible = false;
+  const updateWalletTitle = () => uni.setNavigationBarTitle({ title: balanceTitle.value });
+  onReady(updateWalletTitle);
+  onHide(() => { pageVisible = false; });
+  onShow(() => { pageVisible = true; load(); });
 </script>
 
 <style scoped lang="scss">

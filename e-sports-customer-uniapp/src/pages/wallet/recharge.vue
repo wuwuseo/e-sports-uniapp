@@ -55,7 +55,7 @@
       <view class="pay-wait">
         <view class="pay-wait-title">已提交，待财务确认到账</view>
         <view class="muted">
-          请按归属客服提供的收款账户完成转账，付款备注注明「{{ intent.payment_ref }}」。到账由客服/财务核验，核验后余额与赠送将自动入账。
+          请按归属客服提供的收款账户完成转账，付款备注注明「{{ intent.payment_ref }}」。到账由客服/财务核验，核验后{{ balanceName }}与赠送将自动入账。
         </view>
       </view>
 
@@ -63,15 +63,19 @@
       <view class="muted center">
         扫码支付会打开本站收银台，可在线支付或使用商家码；人工转账仍按下述指引操作。
       </view>
-      <button class="ghost" @click="goWallet">去钱包查看余额</button>
+      <button class="ghost" @click="goWallet">去钱包查看{{ balanceName }}</button>
       <button class="ghost" @click="reset">再充一笔</button>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue';
-  import { createRechargeIntent } from '../../api/esports';
+  import { computed, ref } from 'vue';
+  import { onShow } from '@dcloudio/uni-app';
+  import { createRechargeIntent, fetchWalletDisplay, getWalletDisplayState } from '../../api/esports';
+  const walletDisplays = getWalletDisplayState();
+  const balanceName = computed(() => walletDisplays.value.customer_balance.display_name);
+  onShow(() => { fetchWalletDisplay(); });
   import type { RechargeIntent } from '../../api/esports';
   import { datetime, idempotencyKey, money, yuanToCents } from '../../utils/format';
 

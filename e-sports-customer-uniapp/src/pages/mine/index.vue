@@ -52,7 +52,7 @@
         <text class="arrow">›</text>
       </view>
       <view class="cell" @click="go('/pages/wallet/index')">
-        <text>余额与权益</text>
+        <text>{{ balanceName }}与权益</text>
         <text class="arrow">›</text>
       </view>
       <view class="cell" @click="go('/pages/wallet/recharge')">
@@ -81,12 +81,14 @@
 <script setup lang="ts">
   import { onShow } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
-  import { fetchProfile } from '../../api/esports';
+  import { fetchProfile, fetchWalletDisplay, getWalletDisplayState } from '../../api/esports';
   import type { CustomerProfile } from '../../api/esports';
   import { closeRealtime, realtimeUnread } from '../../api/realtime';
   import { clearToken } from '../../api/request';
 
   const profile = ref<CustomerProfile | null>(null);
+  const walletDisplays = getWalletDisplayState();
+  const balanceName = computed(() => walletDisplays.value.customer_balance.display_name);
   // 未读消息红点：由实时通道下发的服务端未读数驱动。
   const unread = realtimeUnread;
 
@@ -96,6 +98,7 @@
   });
 
   async function load() {
+    await fetchWalletDisplay();
     try {
       profile.value = await fetchProfile();
     } catch {

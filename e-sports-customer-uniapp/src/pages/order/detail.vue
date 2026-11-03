@@ -96,10 +96,10 @@
              已有待核验凭证时隐藏，避免「转账凭证待核验 + 再扣一次余额」造成重复付款。 -->
         <view v-if="internalMethods.length && !proofPending" class="pay-internal">
           <view class="pay-name">站内付款</view>
-          <view class="muted">用余额直接核销，成功后订单即时转为已付款。</view>
+          <view class="muted">用{{ balanceName }}直接核销，成功后订单即时转为已付款。</view>
           <view class="actions">
             <button v-if="hasBalanceMethod" class="primary" :loading="submitting" @click="payByBalance">
-              余额支付
+              {{ balanceName }}支付
             </button>
           </view>
         </view>
@@ -282,6 +282,9 @@
 <script setup lang="ts">
   import { onLoad, onShow, onUnload } from '@dcloudio/uni-app';
   import { computed, reactive, ref } from 'vue';
+  import { fetchWalletDisplay, getWalletDisplayState } from '../../api/esports';
+  const walletDisplays = getWalletDisplayState();
+  const balanceName = computed(() => walletDisplays.value.customer_balance.display_name);
   import {
 	  cancelUnpaidOrder,
     confirmGrabbedPlayer,
@@ -521,7 +524,7 @@
     submitting.value = true;
     try {
       await payOrderByBalance(orderId.value);
-      uni.showToast({ title: '余额核销成功，订单已付款', icon: 'success' });
+      uni.showToast({ title: `${balanceName.value}核销成功，订单已付款`, icon: 'success' });
       await refreshOrder();
       await refreshProofs();
     } catch {
@@ -676,6 +679,7 @@
 
   // 从聚合收款收银台返回时立即刷新订单与凭证状态，不等下一次轮询。
   onShow(() => {
+    fetchWalletDisplay();
     if (!orderId.value || !order.value) return;
     void refreshOrder();
     void refreshProofs();
