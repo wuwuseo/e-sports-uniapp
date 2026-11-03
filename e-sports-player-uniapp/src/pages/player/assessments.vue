@@ -3,12 +3,32 @@
     <view class="card upgrade">
       <view class="section-head">
         <text class="section-title">升级考核</text>
-        <text class="muted">目标档位由系统按当前等级推导</text>
+        <text class="muted">目标档位按所选分区等级推导</text>
       </view>
       <view class="muted">
         累计服务量、综合评分与在岗天数达标后可在线上申请；冷却期内或已有进行中考核时申请会被服务端拦回。
       </view>
-      <button class="primary apply" :loading="applying" :disabled="applying" @click="applyUpgrade">
+      <view class="row">
+        <text>升级分区</text>
+        <picker
+          v-if="gameOptions.length"
+          mode="selector"
+          :range="gameOptions"
+          :value="gameIndex"
+          @change="onGameChange"
+        >
+          <text
+            >{{ selectedGame }} · {{ levelText(profile?.game_levels[selectedGame] || '') }} ›</text
+          >
+        </picker>
+        <text v-else class="muted">暂无已开通分区</text>
+      </view>
+      <button
+        class="primary apply"
+        :loading="applying"
+        :disabled="applying || !selectedGame"
+        @click="applyUpgrade"
+      >
         申请升级考核
       </button>
     </view>
@@ -20,13 +40,19 @@
           <text class="task-no">{{ row.assessment.task_no }}</text>
           <text
             class="score"
-            :class="row.assessment.status === 'passed' ? 'pass' : row.assessment.status === 'failed' ? 'fail' : ''"
+            :class="
+              row.assessment.status === 'passed'
+                ? 'pass'
+                : row.assessment.status === 'failed'
+                ? 'fail'
+                : ''
+            "
           >
             {{ row.assessment.total_score }} 分
           </text>
         </view>
         <view class="muted">
-          {{ typeText(row.assessment.assessment_type) }} · 目标等级
+          {{ typeText(row.assessment.assessment_type) }} · {{ row.assessment.game }} · 目标等级
           {{ levelText(row.assessment.target_level) }} · {{ statusText(row.assessment.status) }}
         </view>
         <view v-if="row.assessment.scheduled_at" class="muted">
@@ -73,9 +99,14 @@
 
 <script setup lang="ts">
   import { onShow } from '@dcloudio/uni-app';
-  import { ref } from 'vue';
-  import { appealAssessment, applyUpgradeAssessment, fetchPlayerAssessments } from '../../api/player';
-  import type { PlayerAssessment, PlayerAssessmentView } from '../../api/player';
+  import { computed, ref } from 'vue';
+  import {
+    appealAssessment,
+    applyUpgradeAssessment,
+    fetchPlayerAssessments,
+    fetchPlayerProfile,
+  } from '../../api/player';
+  import type { PlayerAssessment, PlayerAssessmentView, PlayerProfile } from '../../api/player';
   import { datetime } from '../../utils/format';
 
   import { skillLevelText } from '../../utils/levels';
@@ -84,12 +115,30 @@
   const items = ref<PlayerAssessmentView[]>([]);
   const actingId = ref<number>(0);
   const applying = ref(false);
+  const profile = ref<PlayerProfile | null>(null);
+  const gameIndex = ref(0);
+  const gameOptions = computed(() =>
+    (profile.value?.games || []).filter((game) => !!profile.value?.game_levels[game])
+  );
+  const selectedGame = computed(() => gameOptions.value[gameIndex.value] || '');
+
+  function onGameChange(event: { detail: { value: string | number } }) {
+    gameIndex.value = Number(event.detail.value);
+  }
 
   async function load() {
     try {
-      items.value = (await fetchPlayerAssessments()) || [];
+      const selected = selectedGame.value;
+      const [assessments, playerProfile] = await Promise.all([
+        fetchPlayerAssessments(),
+        fetchPlayerProfile(),
+      ]);
+      items.value = assessments || [];
+      profile.value = playerProfile;
+      gameIndex.value = Math.max(0, gameOptions.value.indexOf(selected));
     } catch {
       items.value = [];
+      profile.value = null;
     }
   }
 
@@ -132,9 +181,13 @@
   }
 
   async function applyUpgrade() {
+    if (!selectedGame.value) {
+      uni.showToast({ title: '请选择要升级的游戏分区', icon: 'none' });
+      return;
+    }
     applying.value = true;
     try {
-      await applyUpgradeAssessment();
+      await applyUpgradeAssessment(selectedGame.value);
       uni.showToast({ title: '已提交升级申请', icon: 'success' });
       await load();
     } catch {
