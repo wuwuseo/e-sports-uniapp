@@ -192,7 +192,28 @@
     uni.reLaunch({ url: '/pages/cs/login' });
   }
 
-  onShow(load);
+  /** tabBar「工作台」索引：回到本页时按实时未读数校正徽标。 */
+  const WORKBENCH_TAB_INDEX = 0;
+
+  // 非 tab 页（如消息页）里调用 tabBar 徽标 API 在 H5 下会被忽略，
+  // 标记已读后徽标会滞留旧值，因此每次回到 tab 页都按 ref 校正一次。
+  function syncUnreadBadge() {
+    const value = realtimeUnread.value;
+    if (value > 0) {
+      uni.setTabBarBadge({
+        index: WORKBENCH_TAB_INDEX,
+        text: value > 99 ? '99+' : `${value}`,
+        fail: () => {},
+      });
+      return;
+    }
+    uni.removeTabBarBadge({ index: WORKBENCH_TAB_INDEX, fail: () => {} });
+  }
+
+  onShow(() => {
+    syncUnreadBadge();
+    load();
+  });
 </script>
 
 <style scoped lang="scss">
