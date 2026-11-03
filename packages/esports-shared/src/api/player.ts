@@ -607,6 +607,8 @@ export interface PlayerAssessment {
   /** entry 入职 / upgrade 升级 / spot_check 抽查复核 / retry 复考。 */
   assessment_type: string;
   target_level: string;
+  /** 本次定级或抽查所绑定的游戏分区。 */
+  game: string;
   /** pending 待分配 / scheduled 已约考核 / passed 通过 / failed 未通过。 */
   status: string;
   /** none / pending 待复核 / approved 申诉成立 / rejected 维持原结论。 */
@@ -658,13 +660,14 @@ export const appealAssessment = (id: number, reason: string) =>
   });
 
 /**
- * 自助申请升级考核：目标档位由服务端按当前等级推导，客户端不能指定。
+ * 自助申请指定分区的升级考核：目标档位由服务端按该分区等级推导，客户端不能指定。
  * 门槛（服务量 / 评分 / 在岗天数）与冷却期不满足时由服务端返回中文提示，重复申请幂等返回既有单。
  */
-export const applyUpgradeAssessment = () =>
+export const applyUpgradeAssessment = (game: string) =>
   request<PlayerAssessment>({
     url: '/user/player/assessments/upgrade-apply',
     method: 'POST',
+    data: { game },
   });
 
 // ── 我的追偿明细 ──
