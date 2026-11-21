@@ -596,6 +596,14 @@ export const fetchOrderQuote = (id: number) =>
 export const fetchOrderMembers = (orderId: number) =>
   request<OrderMember[]>({ url: `/user/orders/${orderId}/members` });
 
+/** 抢单后客户确认陪玩：待客户确认 → 已接单。 */
+export const confirmGrabbedPlayer = (orderId: number) =>
+  request<Order>({ url: `/user/orders/${orderId}/confirm-player`, method: 'POST' });
+
+/** 抢单后客户更换陪玩：释放当前席位，订单回抢单大厅重新抢。 */
+export const declineGrabbedPlayer = (orderId: number) =>
+  request<Order>({ url: `/user/orders/${orderId}/decline-player`, method: 'POST' });
+
 /** 确认或拒绝报价：须带上客户端看到的报价版本，避免覆盖新报价。 */
 export const confirmOrderQuote = (
   id: number,
