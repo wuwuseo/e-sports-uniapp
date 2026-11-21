@@ -41,143 +41,48 @@
 
 <script setup lang="ts">
   import { onHide, onReachBottom, onShow, onUnload } from '@dcloudio/uni-app';
-  import { computed, ref } from 'vue';
+  import { usePagedMessages } from '@esports/shared/composables/usePagedMessages';
   import { fetchPlayerMessages, markPlayerMessagesRead } from '../../api/player';
-  import type { EsportsMessage, MessageListParams } from '../../api/esports';
-  import {
-    onRealtime,
-    onRealtimeReconnect,
-    realtimeUnread,
-    updateRealtimeUnread,
-  } from '../../api/realtime';
+  import type { EsportsMessage } from '../../api/esports';
   import { datetime } from '../../utils/format';
 
   const PAGE_SIZE = 30;
 
-  const items = ref<EsportsMessage[]>([]);
-  const loading = ref(false);
-  const loadingMore = ref(false);
-  const marking = ref(false);
-  const failed = ref(false);
-  const hasMore = ref(true);
-  /** 页面是否在前台：只有前台才在收到推送时重拉列表。 */
-  const visible = ref(false);
-
-  const isUnread = (msg: EsportsMessage) => !msg.read_at;
-  const unreadCount = computed(() => items.value.filter(isUnread).length);
-  const footerText = computed(() => {
-    if (loadingMore.value) return '加载中…';
-    return hasMore.value ? '上拉加载更多' : '没有更多了';
+  const {
+    items,
+    loading,
+    failed,
+    unreadCount,
+    footerText,
+    isUnread,
+    load,
+    loadMore,
+    reload,
+    openMessage,
+    markAllRead,
+    setVisible,
+    bindRealtime,
+  } = usePagedMessages<EsportsMessage>({
+    mode: 'cursor',
+    pageSize: PAGE_SIZE,
+    fetchPage: async ({ beforeId }) => ({
+      items: (await fetchPlayerMessages({ limit: PAGE_SIZE, before_id: beforeId })) || [],
+    }),
+    markRead: markPlayerMessagesRead,
   });
 
-  /** 当前已加载列表中的最小 id，作为下一页的 before_id 游标。 */
-  function oldestId(): number {
-    return items.value.reduce((min, msg) => (min === 0 || msg.id < min ? msg.id : min), 0);
-  }
+  // 模板沿用原变量名，减少改动面。
+  const openMsg = openMessage;
+  const markAll = markAllRead;
 
-  function fetchMessages(params: MessageListParams) {
-    return fetchPlayerMessages(params);
-  }
-
-  /** 本地置为已读，避免标记成功后重新拉列表。 */
-  function applyRead(ids: number[]) {
-    const set = new Set(ids);
-    const now = new Date().toISOString();
-    items.value = items.value.map((msg) =>
-      set.has(msg.id) && !msg.read_at ? { ...msg, read_at: now } : msg
-    );
-  }
-
-  async function load() {
-    if (loading.value) return;
-    loading.value = true;
-    failed.value = false;
-    try {
-      const list = (await fetchMessages({ limit: PAGE_SIZE })) || [];
-      items.value = list;
-      hasMore.value = list.length >= PAGE_SIZE;
-    } catch {
-      // request 层已统一 toast，这里只记录状态供空态提示。
-      failed.value = true;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function loadMore() {
-    if (loading.value || loadingMore.value || !hasMore.value) return;
-    const before = oldestId();
-    if (!before) return;
-    loadingMore.value = true;
-    try {
-      const list = (await fetchMessages({ limit: PAGE_SIZE, before_id: before })) || [];
-      const seen = new Set(items.value.map((msg) => msg.id));
-      items.value = items.value.concat(list.filter((msg) => !seen.has(msg.id)));
-      hasMore.value = list.length >= PAGE_SIZE;
-    } catch {
-      // request 层已统一 toast。
-    } finally {
-      loadingMore.value = false;
-    }
-  }
-
-  /** 下拉/按钮刷新：重新拉第一页。 */
-  function reload() {
-    if (loading.value) return;
-    hasMore.value = true;
-    load();
-  }
-
-  async function openMsg(msg: EsportsMessage) {
-    if (!isUnread(msg) || marking.value) return;
-    marking.value = true;
-    try {
-      await markPlayerMessagesRead([msg.id]);
-      applyRead([msg.id]);
-      // 红点跟随服务端未读数：单条已读后本地减一（服务端下次推送会覆盖为精确值）。
-      updateRealtimeUnread(realtimeUnread.value - 1);
-    } catch {
-      // request 层已统一 toast。
-    } finally {
-      marking.value = false;
-    }
-  }
-
-  async function markAll() {
-    const ids = items.value.filter(isUnread).map((msg) => msg.id);
-    if (ids.length === 0 || marking.value) return;
-    marking.value = true;
-    try {
-      await markPlayerMessagesRead(ids);
-      applyRead(ids);
-      updateRealtimeUnread(realtimeUnread.value - ids.length);
-      uni.showToast({ title: '已全部标为已读', icon: 'none' });
-    } catch {
-      // request 层已统一 toast。
-    } finally {
-      marking.value = false;
-    }
-  }
-
-  // 实时通道：前台收到新消息直接重拉；断线恢复后同样补拉（离线期间的消息本来就在库里）。
-  const offMessage = onRealtime('message.created', () => {
-    if (visible.value) reload();
-  });
-  const offReconnect = onRealtimeReconnect(() => {
-    if (visible.value) reload();
-  });
+  const stopRealtime = bindRealtime();
 
   onShow(() => {
-    visible.value = true;
+    setVisible(true);
     load();
   });
-  onHide(() => {
-    visible.value = false;
-  });
-  onUnload(() => {
-    offMessage();
-    offReconnect();
-  });
+  onHide(() => setVisible(false));
+  onUnload(stopRealtime);
   onReachBottom(loadMore);
 </script>
 
