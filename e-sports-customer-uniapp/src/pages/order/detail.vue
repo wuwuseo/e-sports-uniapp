@@ -165,7 +165,9 @@
       <view class="muted">提案有时限，超时后自动失效，可请客服重新发起。</view>
     </view>
 
-    <view class="card">
+    <!-- 售后是「已付款订单」的服务问题申报：未付款订单还没产生资金往来，
+         直接取消即可，不提供售后入口。exception（支付冲正）说明付过款，仍需保留入口。 -->
+    <view v-if="order.payment_status !== 'unpaid'" class="card">
       <view class="section-title">需要帮助？</view>
       <view class="actions">
         <button class="ghost" @click="openAfterSale">发起售后</button>
