@@ -147,6 +147,9 @@
   }
 
   async function submit() {
+    // 防连点：button 的 loading 只显示图标、不会禁用点击，
+    // 不拦住会在一次「提交不了」的反复点击里落下多张订单。
+    if (submitting.value) return;
     if (!sku.value) {
       uni.showToast({ title: '商品不存在或已下架', icon: 'none' });
       return;
@@ -163,8 +166,16 @@
       setTimeout(() => {
         uni.redirectTo({ url: `/pages/order/detail?id=${order.id}` });
       }, 600);
-    } catch {
-      // request 层已提示（如「限制自助下单，请联系客服或先预付」）。
+    } catch (error) {
+      // request 层已 toast 服务端提示；403「无权访问该客户或订单」多数是账号未建客户档案，
+      // 补一条可操作的引导，避免用户只看到一句看不懂的报错。
+      if ((error as Error)?.message?.includes('无权访问')) {
+        uni.showModal({
+          title: '无法提交报单',
+          content: '当前登录账号还未绑定客户档案，请联系客服建档后再下单。',
+          showCancel: false,
+        });
+      }
     } finally {
       submitting.value = false;
     }
