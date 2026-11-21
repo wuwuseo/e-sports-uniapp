@@ -41,41 +41,52 @@
 
 <script setup lang="ts">
   import { onHide, onReachBottom, onShow, onUnload } from '@dcloudio/uni-app';
-  import { computed, ref } from 'vue';
+  import { usePagedMessages } from '@esports/shared/composables/usePagedMessages';
   import {
     fetchCsMessages,
     markAllCsMessagesRead,
     markCsMessagesRead,
   } from '../../api/cs';
   import type { CsMessage } from '../../api/cs';
-  import {
-    onRealtime,
-    onRealtimeReconnect,
-    realtimeUnread,
-    updateRealtimeUnread,
-  } from '../../api/realtime';
+  import { realtimeUnread, updateRealtimeUnread } from '../../api/realtime';
   import { datetime } from '../../utils/format';
 
   const PAGE_SIZE = 30;
   const SUMMARY_RUNES = 120;
 
-  const items = ref<CsMessage[]>([]);
-  const loading = ref(false);
-  const loadingMore = ref(false);
-  const marking = ref(false);
-  const failed = ref(false);
-  const hasMore = ref(true);
-  const page = ref(1);
-  /** 页面是否在前台：只有前台才在收到推送时重拉列表。 */
-  const visible = ref(false);
-  // 未读总数由服务端下发（含广播消息之外的本人消息），比只统计当前页更准。
-  const unread = realtimeUnread;
-
-  const isUnread = (msg: CsMessage) => !msg.read_at;
-  const footerText = computed(() => {
-    if (loadingMore.value) return '加载中…';
-    return hasMore.value ? '上拉加载更多' : '没有更多了';
+  const {
+    items,
+    loading,
+    failed,
+    unreadCount,
+    footerText,
+    isUnread,
+    load,
+    loadMore,
+    reload,
+    openMessage,
+    markAllRead,
+    setVisible,
+    bindRealtime,
+  } = usePagedMessages<CsMessage>({
+    mode: 'page',
+    pageSize: PAGE_SIZE,
+    fetchPage: async ({ page }) => {
+      const result = await fetchCsMessages({ page, page_size: PAGE_SIZE });
+      return { items: result?.data || [], total: result?.total ?? 0 };
+    },
+    markRead: markCsMessagesRead,
+    // 管理端有 read-all 接口，一次清空服务端未读，比逐条提交加载过的 id 更完整。
+    markAll: () => markAllCsMessagesRead(),
+    // 未读总数由服务端下发（含广播消息之外的本人消息），比只统计当前页更准。
+    countUnread: () => realtimeUnread.value,
+    onRead: (ids, all) => updateRealtimeUnread(all ? 0 : realtimeUnread.value - ids.length),
   });
+
+  // 模板沿用原变量名，减少改动面。
+  const unread = unreadCount;
+  const openMsg = openMessage;
+  const markAll = markAllRead;
 
   /** 消息正文只展示前若干字，完整内容仍在服务端。 */
   function summaryOf(msg: CsMessage): string {
@@ -84,102 +95,14 @@
     return `${content.slice(0, SUMMARY_RUNES)}…`;
   }
 
-  function applyRead(ids: number[]) {
-    const set = new Set(ids);
-    const now = new Date().toISOString();
-    items.value = items.value.map((msg) =>
-      set.has(msg.id) && !msg.read_at ? { ...msg, read_at: now } : msg
-    );
-  }
-
-  async function load() {
-    if (loading.value) return;
-    loading.value = true;
-    failed.value = false;
-    try {
-      const result = await fetchCsMessages({ page: 1, page_size: PAGE_SIZE });
-      items.value = result?.data || [];
-      page.value = 1;
-      hasMore.value = items.value.length < (result?.total ?? 0);
-    } catch {
-      // csRequest 层已统一 toast，这里只记录状态供空态提示。
-      failed.value = true;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function loadMore() {
-    if (loading.value || loadingMore.value || !hasMore.value) return;
-    loadingMore.value = true;
-    try {
-      const nextPage = page.value + 1;
-      const result = await fetchCsMessages({ page: nextPage, page_size: PAGE_SIZE });
-      const seen = new Set(items.value.map((msg) => msg.id));
-      items.value = items.value.concat((result?.data || []).filter((msg) => !seen.has(msg.id)));
-      page.value = nextPage;
-      hasMore.value = items.value.length < (result?.total ?? items.value.length);
-    } catch {
-      // csRequest 层已统一 toast。
-    } finally {
-      loadingMore.value = false;
-    }
-  }
-
-  function reload() {
-    if (loading.value) return;
-    hasMore.value = true;
-    load();
-  }
-
-  async function openMsg(msg: CsMessage) {
-    if (!isUnread(msg) || marking.value) return;
-    marking.value = true;
-    try {
-      await markCsMessagesRead([msg.id]);
-      applyRead([msg.id]);
-      updateRealtimeUnread(realtimeUnread.value - 1);
-    } catch {
-      // csRequest 层已统一 toast。
-    } finally {
-      marking.value = false;
-    }
-  }
-
-  async function markAll() {
-    if (marking.value) return;
-    marking.value = true;
-    try {
-      await markAllCsMessagesRead();
-      applyRead(items.value.filter(isUnread).map((msg) => msg.id));
-      updateRealtimeUnread(0);
-      uni.showToast({ title: '已全部标为已读', icon: 'none' });
-    } catch {
-      // csRequest 层已统一 toast。
-    } finally {
-      marking.value = false;
-    }
-  }
-
-  // 实时通道：前台收到新消息直接重拉；断线恢复后同样补拉（离线期间的消息本来就在库里）。
-  const offMessage = onRealtime('message.created', () => {
-    if (visible.value) reload();
-  });
-  const offReconnect = onRealtimeReconnect(() => {
-    if (visible.value) reload();
-  });
+  const stopRealtime = bindRealtime();
 
   onShow(() => {
-    visible.value = true;
+    setVisible(true);
     load();
   });
-  onHide(() => {
-    visible.value = false;
-  });
-  onUnload(() => {
-    offMessage();
-    offReconnect();
-  });
+  onHide(() => setVisible(false));
+  onUnload(stopRealtime);
   onReachBottom(loadMore);
 </script>
 
