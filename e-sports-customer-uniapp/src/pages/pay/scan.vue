@@ -90,9 +90,9 @@
 <script setup lang="ts">
   import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
   import { computed, ref } from 'vue';
+  import { useCheckoutPolling } from '@esports/shared/composables/useCheckoutPolling';
   import {
     createCheckoutAttempt,
-    fetchCheckoutStatus,
     fetchPublicCheckout,
   } from '../../api/esports';
   import type {
@@ -117,7 +117,30 @@
   const errorText = ref('');
   const checkout = ref<PublicCheckoutView | null>(null);
   const paid = ref(false);
-  const now = ref(Date.now());
+
+  // 倒计时与 3 秒轮询统一走共享 composable，本页只负责 token 与视图同步。
+  const {
+    now,
+    remaining,
+    expired,
+    start: startPolling,
+    stop: stopPolling,
+    check: checkStatus,
+    startTick,
+    resume: resumePolling,
+    pause: pausePolling,
+  } = useCheckoutPolling({
+    getToken: () => token.value,
+    getExpiresAt: () => checkout.value?.business_expires_at,
+    isPaid: () => paid.value,
+    // 状态未知时允许开轮询，拿到非 open 状态后由 composable 停止。
+    canPoll: () => !checkout.value?.status || checkout.value.status === 'open',
+    onPaid: () => handlePaid(),
+    onStatus: (status) => {
+      if (!checkout.value || checkout.value.status === status) return;
+      checkout.value = { ...checkout.value, status };
+    },
+  });
 
   const submitting = ref(false);
   const payingChannel = ref<PayChannel | ''>('');
@@ -128,9 +151,6 @@
 
   const inWechat = ref(false);
   const inAlipay = ref(false);
-
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let tickTimer: ReturnType<typeof setInterval> | null = null;
 
   const bizText = computed(() =>
     checkoutBusinessText(checkout.value?.business_type || '')
@@ -150,13 +170,6 @@
         checkout.value?.status === 'cancelled' ||
         expired.value),
   }));
-  const remaining = computed(() =>
-    remainingText(checkout.value?.business_expires_at, now.value)
-  );
-  const expired = computed(() =>
-    isExpired(checkout.value?.business_expires_at, now.value)
-  );
-
   const envChannel = computed<PayChannel | ''>(() =>
     inWechat.value ? 'wechat' : inAlipay.value ? 'alipay' : ''
   );
@@ -216,54 +229,6 @@
       return decodeURIComponent(match[1]);
     } catch {
       return match[1];
-    }
-  }
-
-  function startTick() {
-    stopTick();
-    tickTimer = setInterval(() => {
-      now.value = Date.now();
-    }, 1000);
-  }
-
-  function stopTick() {
-    if (tickTimer) {
-      clearInterval(tickTimer);
-      tickTimer = null;
-    }
-  }
-
-  function startPolling() {
-    stopPolling();
-    if (!token.value || paid.value) return;
-    const status = checkout.value?.status;
-    if (status && status !== 'open') return;
-    pollTimer = setInterval(() => {
-      void checkStatus();
-    }, 3000);
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
-
-  async function checkStatus() {
-    if (!token.value || paid.value) return;
-    try {
-      const view = await fetchCheckoutStatus(token.value);
-      if (view.paid) {
-        handlePaid();
-        return;
-      }
-      if (view.status && checkout.value && view.status !== checkout.value.status) {
-        checkout.value = { ...checkout.value, status: view.status };
-        if (view.status !== 'open') stopPolling();
-      }
-    } catch {
-      // 网络抖动静默重试。
     }
   }
 
@@ -363,21 +328,13 @@
   });
 
   onShow(() => {
-    startTick();
     // 从服务商收银台 webview 返回时立即补查一次，再恢复轮询。
-    if (token.value && !paid.value) void checkStatus();
-    startPolling();
+    resumePolling();
   });
 
-  onHide(() => {
-    stopTick();
-    stopPolling();
-  });
+  onHide(pausePolling);
 
-  onUnload(() => {
-    stopTick();
-    stopPolling();
-  });
+  onUnload(pausePolling);
 </script>
 
 <style scoped lang="scss">

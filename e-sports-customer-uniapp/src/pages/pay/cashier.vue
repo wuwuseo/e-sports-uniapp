@@ -256,10 +256,10 @@
 <script setup lang="ts">
   import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
   import { computed, reactive, ref } from 'vue';
+  import { useCheckoutPolling } from '@esports/shared/composables/useCheckoutPolling';
   import {
     createCheckout,
     createCheckoutAttempt,
-    fetchCheckoutStatus,
     fetchMyGiftIntents,
     fetchMyOrder,
     fetchPaymentMethodsContext,
@@ -299,7 +299,6 @@
   const loading = ref(true);
   const submitting = ref(false);
   const payingChannel = ref<PayChannel | ''>('');
-  const now = ref(Date.now());
 
   const checkout = ref<CheckoutView | null>(null);
   const publicCheckout = ref<PublicCheckoutView | null>(null);
@@ -333,8 +332,6 @@
     attachment_id: 0,
   });
 
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let tickTimer: ReturnType<typeof setInterval> | null = null;
   let backTimer: ReturnType<typeof setTimeout> | null = null;
 
   const businessTypeValid = computed(
@@ -372,9 +369,35 @@
       businessExpiresAt.value ||
       ''
   );
-  const remaining = computed(() => remainingText(expiresAt.value, now.value));
-  const expired = computed(() => isExpired(expiresAt.value, now.value));
   const entryToken = computed(() => checkout.value?.entry_token || '');
+
+  // 倒计时与 3 秒轮询统一走共享 composable，本页只负责 token、状态同步与支付成功后的交互。
+  const {
+    now,
+    remaining,
+    expired,
+    start: startPolling,
+    stop: stopPolling,
+    check: checkStatus,
+    startTick,
+    resume: resumePolling,
+    pause: pausePolling,
+  } = useCheckoutPolling({
+    getToken: () => entryToken.value,
+    getExpiresAt: () => expiresAt.value,
+    isPaid: () => paid.value,
+    canPoll: () => checkoutStatus.value === 'open',
+    onPaid: (notify) => handlePaid(notify),
+    onStatus: (status) => {
+      if (status === checkoutStatus.value) return;
+      checkoutStatus.value = status;
+      if (checkout.value) checkout.value = { ...checkout.value, status };
+    },
+    onPoll: () => {
+      // 人工凭证核验中：随轮询刷新进度，财务核销/驳回后页面即时反映。
+      if (proofPending.value) void loadProofs();
+    },
+  });
 
   const terminalNotice = computed(() => {
     if (paid.value || checkoutStatus.value === 'paid') return '';
@@ -422,12 +445,13 @@
     }
   });
 
-  // 礼物 / 充值的固定码凭证接口尚未在后端提供，仅订单支持直接提交。
+  // TODO：礼物 / 充值的固定码凭证提交接口（/user/recharge-intents/:intentNo/payment-proof）待后端提供。
+  // 内部接口路径只留在代码里，界面上给客户可理解的说明。
   const manualSupported = computed(() => businessType.value === 'order');
   const manualTodoText = computed(() =>
     businessType.value === 'gift'
-      ? '礼物固定码凭证提交接口待后端提供（TODO）；请先使用在线支付或联系客服核验。'
-      : '充值固定码凭证提交接口待后端提供（TODO：/user/recharge-intents/:intentNo/payment-proof）；请先使用在线支付或沿用充值页转账指引。'
+      ? '礼物暂不支持上传转账凭证，请使用在线支付或联系客服核验。'
+      : '充值暂不支持上传转账凭证，请使用在线支付或联系客服核验。'
   );
 
   const dynamicPending = computed(() => {
@@ -463,53 +487,6 @@
     if (!channels.alipay) return '支付宝暂未开通，请使用微信或商家码。';
     return '';
   });
-
-  function startTick() {
-    stopTick();
-    tickTimer = setInterval(() => {
-      now.value = Date.now();
-    }, 1000);
-  }
-
-  function stopTick() {
-    if (tickTimer) {
-      clearInterval(tickTimer);
-      tickTimer = null;
-    }
-  }
-
-  function startPolling() {
-    stopPolling();
-    if (!entryToken.value || paid.value || checkoutStatus.value !== 'open') return;
-    pollTimer = setInterval(checkStatus, 3000);
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
-
-  async function checkStatus() {
-    if (!entryToken.value || paid.value) return;
-    try {
-      const view = await fetchCheckoutStatus(entryToken.value);
-      if (view.paid) {
-        handlePaid(true);
-        return;
-      }
-      if (view.status && view.status !== checkoutStatus.value) {
-        checkoutStatus.value = view.status;
-        if (checkout.value) checkout.value = { ...checkout.value, status: view.status };
-        if (view.status !== 'open') stopPolling();
-      }
-      // 人工凭证核验中：随轮询刷新进度，财务核销/驳回后页面即时反映。
-      if (proofPending.value) void loadProofs();
-    } catch {
-      // 网络抖动静默重试，等待中的用户不需要 toast。
-    }
-  }
 
   function handlePaid(notify: boolean) {
     if (paid.value) return;
@@ -900,21 +877,14 @@
   });
 
   onShow(() => {
-    startTick();
-    if (!businessTypeValid.value) return;
     // 从服务商收银台 webview 返回时立即补查一次，再恢复 3 秒轮询。
-    if (entryToken.value && !paid.value) void checkStatus();
-    startPolling();
+    resumePolling();
   });
 
-  onHide(() => {
-    stopTick();
-    stopPolling();
-  });
+  onHide(pausePolling);
 
   onUnload(() => {
-    stopTick();
-    stopPolling();
+    pausePolling();
     if (backTimer) {
       clearTimeout(backTimer);
       backTimer = null;
