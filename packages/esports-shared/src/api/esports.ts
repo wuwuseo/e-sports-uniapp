@@ -30,6 +30,7 @@ export type FulfillmentStatus =
   | 'pending_dispatch'
   | 'pending_acceptance'
   | 'grabbing'
+  | 'pending_customer_confirm'
   | 'accepted'
   | 'in_service'
   | 'pending_close'
@@ -65,6 +66,8 @@ export interface Order {
   payment_status: string;
   payment_channel: string;
   fulfillment_status: FulfillmentStatus;
+  /** 抢单成功后等待客户确认的截止时间；超时后系统自动确认。 */
+  customer_confirm_deadline?: string | null;
   refund_status: string;
   refunded_cents: number;
   addon_cents: number;
@@ -592,6 +595,14 @@ export const fetchOrderQuote = (id: number) =>
 /** 订单服务成员（服务评价前置）：含展示名与是否已评价。 */
 export const fetchOrderMembers = (orderId: number) =>
   request<OrderMember[]>({ url: `/user/orders/${orderId}/members` });
+
+/** 抢单后客户确认陪玩：待客户确认 → 已接单。 */
+export const confirmGrabbedPlayer = (orderId: number) =>
+  request<Order>({ url: `/user/orders/${orderId}/confirm-player`, method: 'POST' });
+
+/** 抢单后客户更换陪玩：释放当前席位，订单回抢单大厅重新抢。 */
+export const declineGrabbedPlayer = (orderId: number) =>
+  request<Order>({ url: `/user/orders/${orderId}/decline-player`, method: 'POST' });
 
 /** 确认或拒绝报价：须带上客户端看到的报价版本，避免覆盖新报价。 */
 export const confirmOrderQuote = (
