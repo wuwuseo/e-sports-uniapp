@@ -13,6 +13,7 @@
     "./api/upload": "./src/api/upload.ts",
     "./api/cs.close-evidence.contract": "./src/api/cs.close-evidence.contract.ts",
     "./utils/format": "./src/utils/format.ts",
+    "./utils/badge": "./src/utils/badge.ts",
     "./utils/levels": "./src/utils/levels.ts",
     "./utils/pay": "./src/utils/pay.ts",
     "./utils/evidence": "./src/utils/evidence.ts",

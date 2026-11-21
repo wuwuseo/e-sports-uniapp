@@ -277,6 +277,8 @@ export interface DispatchBoard {
   public_pool: CsOrder[];
   grabbing: CsOrder[];
   pending_acceptance: CsOrder[];
+  // 陪玩已抢单、等待客户确认的订单。
+  pending_customer_confirm: CsOrder[];
   accepted: CsOrder[];
   in_service: CsOrder[];
   pending_close: CsOrder[];
