@@ -1,7 +1,7 @@
 // 聚合收款前端辅助：扫码入口链接、二维码渲染、支付地址跳转与倒计时文案。
 // 收银台页与公开扫码页共用，避免两处逻辑漂移。
 
-import QRCode from 'qrcode';
+import { renderSVG } from 'uqr';
 import type { CheckoutStatus } from '../api/esports';
 import { API_BASE } from '../api/request';
 
@@ -20,18 +20,23 @@ export function checkoutScanUrl(token: string): string {
 }
 
 /**
- * 渲染二维码为 data URL。
- * 依赖 qrcode 的浏览器实现（项目已安装 qrcode + @types/qrcode）；
- * 内容过长或运行环境不支持 canvas 时返回空串，由页面回落到文本 + 复制按钮。
+ * 渲染二维码为可直接给 `<image>` 的 data URL。
+ * 用纯 ESM、零依赖的 uqr 输出 SVG：之前的 qrcode 是 CJS，在 pnpm 软链结构下
+ * dev 需要额外预构建、build 还会把 dijkstrajs 打成裸导入（产物运行时 404）。
+ * 内容过长或环境异常时返回空串，由页面回落到文本 + 复制按钮。
  */
 export async function renderQrDataUrl(text: string): Promise<string> {
   if (!text) return '';
   try {
-    return await QRCode.toDataURL(text, {
-      margin: 1,
-      width: 360,
-      errorCorrectionLevel: 'M',
+    const svg = renderSVG(text, {
+      ecc: 'M',
+      border: 2,
+      // 每模块 8px：常见 URL 尺寸下约 300px，页面再按 CSS 宽度缩放。
+      pixelSize: 8,
+      whiteColor: '#ffffff',
+      blackColor: '#000000',
     });
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   } catch {
     return '';
   }
