@@ -25,7 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 const BRANCHES = ['cs', 'customer', 'player', 'master'];
 const PKG_DIR = 'packages/esports-shared';
-const ALLOW_DIFF = new Set(['utils/format.ts']);
+// 按端差异只允许出现在角色话术常量上；金额换算等逻辑仍在 utils/format.ts。
+const ALLOW_DIFF = new Set(['utils/role-text.ts']);
 
 const args = process.argv.slice(2);
 const fromArg = args.find((a) => a.startsWith('--from='));

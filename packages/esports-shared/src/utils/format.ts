@@ -1,5 +1,6 @@
 // 展示层格式化与枚举文案：与服务端枚举值一一对应，新增枚举时在此补文案。
 import Big from 'big.js';
+import { pendingCustomerConfirmText } from './role-text';
 
 /** 元转分：big.js 十进制高精度，规避 8.475 * 100 = 847.4999… 这类浮点误差。 */
 export const yuanToCents = (value: number | string): number =>
@@ -22,13 +23,46 @@ export const fulfillmentText = (status: string) =>
       pending_dispatch: '待派单',
       pending_acceptance: '待接单',
       grabbing: '抢单中',
-      pending_customer_confirm: '待客户确认',
+      pending_customer_confirm: pendingCustomerConfirmText,
       accepted: '已接单',
       in_service: '服务中',
       pending_close: '待结单',
       pending_close_review: '待复核',
       completed: '已完成',
       cancelled: '已取消',
+    }) as Record<string, string>
+  )[status] || status;
+
+/** 订单支付状态文案（payment_status）。 */
+export const paymentStatusText = (status: string) =>
+  (
+    ({
+      unpaid: '未付款',
+      partial: '部分付款',
+      paid: '已付款',
+      exception: '异常',
+    }) as Record<string, string>
+  )[status] || status;
+
+/** 订单预约状态文案（appointment_status）。 */
+export const appointmentStatusText = (status: string) =>
+  (
+    ({
+      instant: '即时',
+      request: '待确认档期',
+      confirmed: '已确认档期',
+    }) as Record<string, string>
+  )[status] || status;
+
+/** 客户跟进状态文案（follow_status）。 */
+export const followStatusText = (status: string) =>
+  (
+    ({
+      new: '新客',
+      following: '跟进中',
+      pending: '待跟进',
+      dormant: '沉睡',
+      closed: '已关闭',
     }) as Record<string, string>
   )[status] || status;
 
