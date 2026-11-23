@@ -6,6 +6,16 @@ export default defineConfig({
   plugins: [uni()],
   // 共享包以源码加载，新增导出后无需清理旧的预构建副本。
   optimizeDeps: {
+    // qrcode 是 CJS（browser 字段指向 lib/browser.js）。共享包以源码方式加载时，
+    // 它不会被预构建，dev 下会被当 ESM 直接返回、缺少 default 导出，
+    // 导致 import 了 utils/pay 的收银台/扫码页整个组件加载失败。
+    include: ["qrcode"],
+    esbuildOptions: {
+      // pnpm 下 qrcode 是指向 .pnpm 的软链，它自己的依赖 dijkstrajs 只存在于
+      // 软链目标的同级 node_modules 里。预构建若保留软链路径会解析不到，
+      // 这里改为按真实路径解析。
+      preserveSymlinks: false,
+    },
     exclude: [
       "@esports/shared",
       "@esports/shared/api/esports",
