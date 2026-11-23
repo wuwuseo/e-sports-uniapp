@@ -73,23 +73,29 @@
           <view class="muted">请在收银台重新提交清晰的付款凭证。</view>
         </view>
 
-        <view class="actions">
-          <button class="primary" @click="openCashier">聚合收款</button>
-        </view>
-        <view class="muted">
-          聚合收款支持微信 / 支付宝在线支付与商家码人工核验；付款凭证统一在收银台提交。
-        </view>
+        <!-- 聚合在线支付（汇付 / 收钱吧等）：可用时作为唯一在线入口。 -->
+        <template v-if="aggregateAvailable">
+          <view class="actions">
+            <button class="primary" @click="openCashier">在线支付</button>
+          </view>
+          <view class="muted">
+            支持微信 / 支付宝在线支付，付款结果与凭证统一在收银台查看。
+          </view>
+        </template>
 
-        <!-- 服务商在线支付：保留原有 pay_url 收银台链路，服务商配好后可用。 -->
-        <view v-if="externalMethods.length && !proofPending" class="pay-online">
-          <view class="pay-name">在线支付（服务商）</view>
+        <!-- 人工核验的离线收款：只在没有在线聚合支付时兜底，且必须已配置收款账户。 -->
+        <view v-else-if="externalMethods.length && !proofPending" class="pay-online">
+          <view class="pay-name">其它收款方式（人工核验）</view>
           <view v-for="m in externalMethods" :key="m.channel" class="pay-method">
             <view>
               <text class="pay-name">{{ m.name }}</text>
               <text class="pay-hint">{{ accountHint(m) }}</text>
             </view>
-            <button class="mini" :loading="submitting" @click="payOnline(m)">在线支付</button>
+            <button class="mini" :loading="submitting" @click="payOnline(m)">去付款</button>
           </view>
+        </view>
+        <view v-else-if="!internalMethods.length && !proofPending" class="muted">
+          当前暂无可用的收款方式，请联系客服确认。
         </view>
 
         <!-- 站内付款：余额足额核销，不走上传凭证链路。
@@ -298,7 +304,7 @@
     fetchMyRescheduleProposals,
     fetchOrderMembers,
     fetchOrderQuote,
-    fetchPaymentMethods,
+    fetchPaymentMethodsContext,
     fetchPaymentProofs,
     payOrderByBalance,
     startOrderPayment,
@@ -326,13 +332,21 @@
 
   // 支付方式：读取后台启用的收款方式与财务审核通过的收款账户。
   const paymentMethods = ref<PaymentMethod[]>([]);
+  // 在线聚合支付（汇付 / 收钱吧）是否可用：可用时不再展示人工核验的离线收款。
+  const aggregateAvailable = ref(false);
   const proofs = ref<PaymentProof[]>([]);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   /** 报价确认门禁：未确认报价不展示收款账户与付款表单。 */
   const quoteConfirmed = computed(() => quote.value?.confirmed === true);
+  // 只保留真正配了收款账户的离线方式；没配账户的渠道不展示，避免点了才发现不可用。
   const externalMethods = computed(() =>
-    paymentMethods.value.filter((method) => method.kind === 'external' && method.enabled)
+    paymentMethods.value.filter(
+      (method) =>
+        method.kind === 'external' &&
+        method.enabled &&
+        (method.accounts?.length || 0) > 0
+    )
   );
   /** 站内付款方式（余额）：同样受后台启停约束。 */
   const internalMethods = computed(() =>
@@ -439,9 +453,16 @@
       }
     }
     try {
-      paymentMethods.value = (await fetchPaymentMethods()) || [];
+      // 带上业务上下文：既取收款方式，也取「在线聚合支付是否可用」用于决定展示哪种入口。
+      const context = await fetchPaymentMethodsContext({
+        business_type: 'order',
+        business_id: orderId.value,
+      });
+      paymentMethods.value = context?.methods || [];
+      aggregateAvailable.value = !!context?.aggregate?.available;
     } catch {
       paymentMethods.value = [];
+      aggregateAvailable.value = false;
     }
     // 改期提案：按本人可见范围取本单提案（待确认优先），空列表即不展示该卡片。
     try {
