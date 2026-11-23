@@ -3,7 +3,7 @@
     <view class="card">
       <view class="row">
         <text class="name">{{ overview?.customer.display_name || '客户' }}</text>
-        <text class="status">{{ followText(overview?.follow_status || '') }}</text>
+        <text class="status">{{ followStatusText(overview?.follow_status || '') }}</text>
       </view>
       <view class="muted">
         {{ overview?.customer.phone || '未留手机号' }} · 等级 {{ overview?.member_level_code || '未定级' }}
@@ -109,7 +109,7 @@
     updateCustomerProfile,
   } from '../../api/cs';
   import type { CustomerFollowUp, CustomerProfileOverview } from '../../api/cs';
-  import { datetime, money } from '../../utils/format';
+  import { datetime, followStatusText, money } from '../../utils/format';
   import { walletAmountText } from '../../api/esports';
 
   const walletDisplays = getCsWalletDisplayState();
@@ -135,20 +135,6 @@
     consumption_preference: '',
     tagsText: '',
   });
-
-  function followText(status: string): string {
-    return (
-      (
-        {
-          new: '新客',
-          following: '跟进中',
-          pending: '待跟进',
-          dormant: '沉睡',
-          closed: '已关闭',
-        } as Record<string, string>
-      )[status] || status
-    );
-  }
 
   function goGift() {
     uni.navigateTo({ url: `/pages/cs/gift?customer_id=${id.value}` });

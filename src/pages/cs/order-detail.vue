@@ -9,8 +9,8 @@
         {{ fulfillmentText(order.fulfillment_status) }} · 客户#{{ order.customer_id }} ·
         商品#{{ order.product_id }} · {{ order.quantity }} 份
       </view>
-      <view class="muted">付款：{{ paymentText(order.payment_status) }}（{{ order.payment_channel }}）</view>
-      <view class="muted">预约：{{ appointmentText(order.appointment_status) }}</view>
+      <view class="muted">付款：{{ paymentStatusText(order.payment_status) }}（{{ order.payment_channel }}）</view>
+      <view class="muted">预约：{{ appointmentStatusText(order.appointment_status) }}</view>
       <view v-if="order.requested_start_at" class="muted">预约开始：{{ datetime(order.requested_start_at) }}</view>
       <view class="muted">负责客服：{{ order.responsible_admin_id ?? '未认领' }}</view>
       <view class="muted">
@@ -254,11 +254,14 @@
     CsOrderCloseFormView,
   } from '../../api/cs';
   import {
+    appointmentStatusText,
     datetime,
     fulfillmentText,
     money,
+    paymentStatusText,
     yuanToCents,
   } from '../../utils/format';
+  import { promptModal } from '../../utils/dialog';
 
   const id = ref(0);
   const order = ref<CsOrder | null>(null);
@@ -388,20 +391,17 @@
     });
   }
 
-  const canTransfer = computed(() => {
+  // 未取消、未完成的订单才允许转单 / 取消：两处条件一致，收成一个判据，
+  // 将来若业务上区分，改这里即可。
+  const isOrderActive = computed(() => {
     if (!order.value) return false;
     return (
       order.value.fulfillment_status !== 'cancelled' &&
       order.value.fulfillment_status !== 'completed'
     );
   });
-  const canCancel = computed(() => {
-    if (!order.value) return false;
-    return (
-      order.value.fulfillment_status !== 'cancelled' &&
-      order.value.fulfillment_status !== 'completed'
-    );
-  });
+  const canTransfer = isOrderActive;
+  const canCancel = isOrderActive;
 
   function inputValue(e: Event): string {
     return String((e as unknown as { detail?: { value?: unknown } }).detail?.value ?? '');
@@ -410,31 +410,6 @@
   function pickerValue(e: Event): number {
     const v = Number((e as unknown as { detail?: { value?: number } }).detail?.value);
     return Number.isInteger(v) ? v : -1;
-  }
-
-  function paymentText(s: string): string {
-    return (
-      (
-        {
-          unpaid: '未付款',
-          partial: '部分付款',
-          paid: '已付款',
-          exception: '异常',
-        } as Record<string, string>
-      )[s] || s
-    );
-  }
-
-  function appointmentText(s: string): string {
-    return (
-      (
-        {
-          instant: '即时',
-          request: '待确认档期',
-          confirmed: '已确认档期',
-        } as Record<string, string>
-      )[s] || s
-    );
   }
 
   function addonStatusText(s: string): string {
@@ -466,20 +441,15 @@
 
   // ── 催单 ──
   async function remind() {
-    const res = await new Promise<{ confirm: boolean; content?: string }>((resolve) => {
-      uni.showModal({
-        title: '催单',
-        content: '请填写催单备注',
-        editable: true,
-        placeholderText: '催单备注',
-        success: (r) => resolve(r),
-        fail: () => resolve({ confirm: false }),
-      });
-    });
-    if (!res.confirm) return;
+    const { confirm, text } = await promptModal(
+      '催单',
+      '催单备注',
+      '请填写催单备注'
+    );
+    if (!confirm) return;
     actingId.value = id.value;
     try {
-      await remindOrder(id.value, 1, (res.content || '').trim());
+      await remindOrder(id.value, 1, text);
       uni.showToast({ title: '已催单', icon: 'success' });
     } catch {
       // csRequest 层已提示。
@@ -519,26 +489,23 @@
   }
 
   // ── 取消 ──
-  function openCancel() {
-    uni.showModal({
-      title: '取消订单',
-      content: '请填写取消原因',
-      editable: true,
-      placeholderText: '取消原因',
-      success: async (r) => {
-        if (!r.confirm || !(r.content || '').trim()) return;
-        actingId.value = id.value;
-        try {
-          await cancelOrder(id.value, (r.content || '').trim());
-          uni.showToast({ title: '已取消', icon: 'success' });
-          await load();
-        } catch {
-          // csRequest 层已提示。
-        } finally {
-          actingId.value = 0;
-        }
-      },
-    });
+  async function openCancel() {
+    const { confirm, text } = await promptModal(
+      '取消订单',
+      '取消原因',
+      '请填写取消原因'
+    );
+    if (!confirm || !text) return;
+    actingId.value = id.value;
+    try {
+      await cancelOrder(id.value, text);
+      uni.showToast({ title: '已取消', icon: 'success' });
+      await load();
+    } catch {
+      // csRequest 层已提示。
+    } finally {
+      actingId.value = 0;
+    }
   }
 
   // ── 加钟 ──
@@ -764,23 +731,20 @@
     }
   }
 
-  function openReject() {
-    uni.showModal({
-      title: '复核驳回',
-      content: '请填写驳回原因',
-      editable: true,
-      placeholderText: '驳回原因',
-      success: async (r) => {
-        if (!r.confirm || !(r.content || '').trim()) return;
-        try {
-          await rejectCloseReview(id.value, (r.content || '').trim());
-          uni.showToast({ title: '已驳回，订单回退待结单', icon: 'success' });
-          await load();
-        } catch {
-          // csRequest 层已提示。
-        }
-      },
-    });
+  async function openReject() {
+    const { confirm, text } = await promptModal(
+      '复核驳回',
+      '驳回原因',
+      '请填写驳回原因'
+    );
+    if (!confirm || !text) return;
+    try {
+      await rejectCloseReview(id.value, text);
+      uni.showToast({ title: '已驳回，订单回退待结单', icon: 'success' });
+      await load();
+    } catch {
+      // csRequest 层已提示。
+    }
   }
 
   onLoad((query) => {

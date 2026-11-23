@@ -25,8 +25,8 @@
       <view class="muted" @click="toggleDetail(item.id)">{{ datetime(item.created_at) }}</view>
 
       <view v-if="expanded === item.id" class="detail">
-        <view class="muted">付款状态：{{ paymentText(item.payment_status) }}（{{ item.payment_channel }}）</view>
-        <view class="muted">预约状态：{{ appointmentText(item.appointment_status) }}</view>
+        <view class="muted">付款状态：{{ paymentStatusText(item.payment_status) }}（{{ item.payment_channel }}）</view>
+        <view class="muted">预约状态：{{ appointmentStatusText(item.appointment_status) }}</view>
         <view v-if="item.requested_start_at" class="muted">预约开始：{{ datetime(item.requested_start_at) }}</view>
         <view class="muted">负责客服：{{ item.responsible_admin_id ?? '未认领' }}</view>
         <view class="muted">加钟追加：{{ money(item.addon_cents) }} · 已退款：{{ money(item.refunded_cents) }}</view>
@@ -134,7 +134,14 @@
     submitOfflinePaymentProof,
   } from '../../api/cs';
   import type { CsOrder, DispatchCandidate, PaymentAccount } from '../../api/cs';
-  import { datetime, fulfillmentText, money } from '../../utils/format';
+  import {
+    appointmentStatusText,
+    datetime,
+    fulfillmentText,
+    money,
+    paymentStatusText,
+  } from '../../utils/format';
+  import { promptModal } from '../../utils/dialog';
 
   import { skillLevelText } from '../../utils/levels';
   const tabs = [
@@ -188,31 +195,6 @@
     proofForm.value.account_id = String(accounts.value[v]?.id ?? '');
   }
 
-  function paymentText(s: string): string {
-    return (
-      (
-        {
-          unpaid: '未付款',
-          partial: '部分付款',
-          paid: '已付款',
-          exception: '异常',
-        } as Record<string, string>
-      )[s] || s
-    );
-  }
-
-  function appointmentText(s: string): string {
-    return (
-      (
-        {
-          instant: '即时',
-          request: '待确认档期',
-          confirmed: '已确认档期',
-        } as Record<string, string>
-      )[s] || s
-    );
-  }
-
   // 技能等级文案走系统配置，App 启动时已拉取。
   const levelText = (s: string) => skillLevelText(s);
 
@@ -263,18 +245,13 @@
   async function assign(item: CsOrder, cand: DispatchCandidate) {
     let seatIndex = 1;
     if (item.required_seats > 1) {
-      const res = await new Promise<{ confirm: boolean; content?: string }>((resolve) => {
-        uni.showModal({
-          title: '选择席位',
-          content: `该订单共 ${item.required_seats} 席，请输入指派席位序号（1-${item.required_seats}）`,
-          editable: true,
-          placeholderText: '席位序号',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      });
-      if (!res.confirm) return;
-      const n = Number(res.content);
+      const { confirm, text } = await promptModal(
+        '选择席位',
+        '席位序号',
+        `该订单共 ${item.required_seats} 席，请输入指派席位序号（1-${item.required_seats}）`
+      );
+      if (!confirm) return;
+      const n = Number(text);
       if (!Number.isInteger(n) || n < 1 || n > item.required_seats) {
         uni.showToast({ title: '席位序号无效', icon: 'none' });
         return;
@@ -296,20 +273,15 @@
   }
 
   async function remind(item: CsOrder) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>((resolve) => {
-      uni.showModal({
-        title: '催单',
-        content: '请填写催单备注',
-        editable: true,
-        placeholderText: '催单备注',
-        success: (r) => resolve(r),
-        fail: () => resolve({ confirm: false }),
-      });
-    });
-    if (!res.confirm) return;
+    const { confirm, text } = await promptModal(
+      '催单',
+      '催单备注',
+      '请填写催单备注'
+    );
+    if (!confirm) return;
     actingId.value = item.id;
     try {
-      await remindOrder(item.id, 1, (res.content || '').trim());
+      await remindOrder(item.id, 1, text);
       uni.showToast({ title: '已催单', icon: 'success' });
     } catch {
       // csRequest 层已提示。

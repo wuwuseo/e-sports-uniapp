@@ -25,7 +25,7 @@
     >
       <view class="row">
         <text class="name">{{ item.display_name }}</text>
-        <text class="status">{{ followText(item.follow_status) }}</text>
+        <text class="status">{{ followStatusText(item.follow_status) }}</text>
       </view>
       <view class="muted">
         {{ item.phone || '未留手机号' }} · 等级 {{ item.member_level_code || '未定级' }}
@@ -43,7 +43,7 @@
   import { computed, ref } from 'vue';
   import { fetchCsCustomers } from '../../api/cs';
   import type { CsCustomer } from '../../api/cs';
-  import { datetime } from '../../utils/format';
+  import { datetime, followStatusText } from '../../utils/format';
 
   const statusTabs = [
     { label: '全部', value: '' },
@@ -69,20 +69,6 @@
       );
     });
   });
-
-  function followText(status: string): string {
-    return (
-      (
-        {
-          new: '新客',
-          following: '跟进中',
-          pending: '待跟进',
-          dormant: '沉睡',
-          closed: '已关闭',
-        } as Record<string, string>
-      )[status] || status
-    );
-  }
 
   async function load() {
     try {

@@ -236,6 +236,7 @@
   import type { CsAfterSale, CsAfterSaleAction, CsAfterSaleMessage } from '../../api/cs';
   import { afterSaleKindText, afterSaleStatusText, afterSaleKinds, datetime, money } from '../../utils/format';
   import { pickEvidenceAttachments } from '../../utils/evidence';
+  import { promptModal } from '../../utils/dialog';
 
   const tabs = [
     { label: '全部', value: '' },
@@ -572,20 +573,16 @@
 
   /** 审批驳回：仅「待审批」单可用，与「代客确认」是两个独立动作。 */
   function openReject(item: CsAfterSale) {
-    uni.showModal({
-      title: '审批驳回',
-      content: '请填写驳回原因',
-      editable: true,
-      placeholderText: '驳回原因',
-      success: async (r) => {
-        if (!r.confirm) return;
-        if (!r.content?.trim()) {
+    promptModal('审批驳回', '驳回原因', '请填写驳回原因').then(
+      async ({ confirm, text }) => {
+        if (!confirm) return;
+        if (!text) {
           uni.showToast({ title: '驳回原因不能为空', icon: 'none' });
           return;
         }
         actingId.value = item.id;
         try {
-          await rejectAfterSale(item.id, r.content.trim());
+          await rejectAfterSale(item.id, text);
           uni.showToast({ title: '已审批驳回', icon: 'success' });
           await load();
         } catch {
@@ -593,8 +590,8 @@
         } finally {
           actingId.value = 0;
         }
-      },
-    });
+      }
+    );
   }
 
   async function execute(item: CsAfterSale) {
