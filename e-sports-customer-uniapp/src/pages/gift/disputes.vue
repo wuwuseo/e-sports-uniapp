@@ -126,6 +126,7 @@ import {
   yuanToCents,
 } from '../../utils/format';
 import { pickEvidenceAttachments } from '../../utils/evidence';
+import { promptModal } from '../../utils/dialog';
 
 const kinds: Array<{ label: string; value: GiftDispute['kind'] }> = [
   { label: '未收到礼物', value: 'not_received' },
@@ -184,17 +185,9 @@ async function load() {
   }
 }
 
+// 争议诉求 / 退款金额输入：取消与失败都返回空串，调用方按「未填写」处理。
 function prompt(title: string, placeholder: string, value = '') {
-  return new Promise<string>((resolve) => {
-    uni.showModal({
-      title,
-      editable: true,
-      placeholderText: placeholder,
-      content: value,
-      success: (res) => resolve(res.confirm ? (res.content || '').trim() : ''),
-      fail: () => resolve(''),
-    });
-  });
+  return promptModal(title, placeholder, value).then(({ text }) => text);
 }
 
 async function apply(order: GiftOrder) {

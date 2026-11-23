@@ -39,6 +39,7 @@
   import { appealMyReview, fetchMyReviews } from '../../api/esports';
   import type { MyReview } from '../../api/esports';
   import { datetime } from '../../utils/format';
+  import { promptModal } from '../../utils/dialog';
 
   // 我的评价：`GET /user/reviews` 带 review_id 与 can_appeal，
   // 可申诉时直接调 `POST /user/reviews/:id/appeal`，提交后刷新申诉状态。
@@ -54,18 +55,12 @@
   }
 
   async function appeal(item: MyReview) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>((resolve) => {
-      uni.showModal({
-        title: '评价申诉',
-        content: '请填写申诉理由（如评价与事实不符、被误判为异常）',
-        editable: true,
-        placeholderText: '申诉理由',
-        success: (r) => resolve(r),
-        fail: () => resolve({ confirm: false }),
-      });
-    });
-    if (!res.confirm) return;
-    const reason = (res.content || '').trim();
+    const { confirm, text: reason } = await promptModal(
+      '评价申诉',
+      '申诉理由',
+      '请填写申诉理由（如评价与事实不符、被误判为异常）'
+    );
+    if (!confirm) return;
     if (!reason) {
       uni.showToast({ title: '申诉理由不能为空', icon: 'none' });
       return;
