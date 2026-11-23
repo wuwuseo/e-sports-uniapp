@@ -204,6 +204,7 @@
   import { datetime, fulfillmentText, idempotencyKey, money } from '../../utils/format';
 
   import { skillLevelText } from '../../utils/levels';
+  import { promptModal } from '../../utils/dialog';
   const tabs = [
     { key: 'pending_acceptance', title: '待接单' },
     { key: 'accepted', title: '已接单' },
@@ -241,15 +242,12 @@
   }
 
   async function pause(item: PlayerOrder) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>((resolve) => {
-      uni.showModal({
-        title: '暂停服务', content: '请填写暂停原因', editable: true,
-        placeholderText: '暂停原因',
-        success: (r) => resolve(r), fail: () => resolve({ confirm: false }),
-      });
-    });
-    if (!res.confirm) return;
-    const reason = res.content?.trim() || '';
+    const { confirm, text: reason } = await promptModal(
+      '暂停服务',
+      '暂停原因',
+      '请填写暂停原因'
+    );
+    if (!confirm) return;
     if (!reason) {
       uni.showToast({ title: '请填写暂停原因', icon: 'none' });
       return;
@@ -293,38 +291,24 @@
   }
 
   async function finish(item: PlayerOrder) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '结束服务',
-          content: '请填写本次上报的服务量（如局数 / 时长）',
-          editable: true,
-          placeholderText: '上报服务量',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const unitsInput = await promptModal(
+      '结束服务',
+      '上报服务量',
+      '请填写本次上报的服务量（如局数 / 时长）'
     );
-    if (!res.confirm) return;
-    const units = Number(res.content);
+    if (!unitsInput.confirm) return;
+    const units = Number(unitsInput.text);
     if (!Number.isSafeInteger(units) || units <= 0) {
       uni.showToast({ title: '请填写有效的服务量', icon: 'none' });
       return;
     }
-    const durationRes = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '上报服务时长',
-          content: '请填写实际服务分钟数，系统会与计时记录核对',
-          editable: true,
-          placeholderText: '实际服务分钟数',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const durationInput = await promptModal(
+      '上报服务时长',
+      '实际服务分钟数',
+      '请填写实际服务分钟数，系统会与计时记录核对'
     );
-    if (!durationRes.confirm) return;
-    const minutes = Number(durationRes.content);
+    if (!durationInput.confirm) return;
+    const minutes = Number(durationInput.text);
     const reportedSeconds = Math.round(minutes * 60);
     if (
       !Number.isFinite(minutes) ||
@@ -404,26 +388,19 @@
   }
 
   async function transfer(item: PlayerOrder) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '发起转单',
-          content: '转单须客服确认后才生效，请填写转单原因',
-          editable: true,
-          placeholderText: '转单原因',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const { confirm, text } = await promptModal(
+      '发起转单',
+      '转单原因',
+      '转单须客服确认后才生效，请填写转单原因'
     );
-    if (!res.confirm) return;
-    if (!res.content?.trim()) {
+    if (!confirm) return;
+    if (!text) {
       uni.showToast({ title: '转单原因不能为空', icon: 'none' });
       return;
     }
     actingId.value = item.id;
     try {
-      await requestTransfer(item.id, res.content.trim(), idempotencyKey('tr'));
+      await requestTransfer(item.id, text, idempotencyKey('tr'));
       uni.showToast({ title: '已提交，待客服确认', icon: 'success' });
       load();
     } catch {

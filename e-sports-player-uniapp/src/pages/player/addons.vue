@@ -28,6 +28,7 @@
   import { confirmAddon, fetchPendingAddons, rejectAddon } from '../../api/player';
   import type { Addon } from '../../api/player';
   import { money } from '../../utils/format';
+  import { promptModal } from '../../utils/dialog';
 
   const addons = ref<Addon[]>([]);
   const actingId = ref<number>(0);
@@ -54,25 +55,18 @@
   }
 
   async function reject(item: Addon) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '拒绝加钟',
-          content: '请填写拒绝原因',
-          editable: true,
-          placeholderText: '拒绝原因',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const { confirm, text } = await promptModal(
+      '拒绝加钟',
+      '拒绝原因',
+      '请填写拒绝原因'
     );
-    if (!res.confirm) return;
-    if (!res.content?.trim()) {
+    if (!confirm) return;
+    if (!text) {
       uni.showToast({ title: '拒绝原因不能为空', icon: 'none' });
       return;
     }
     try {
-      await rejectAddon(item.id, res.content.trim());
+      await rejectAddon(item.id, text);
       uni.showToast({ title: '已拒绝', icon: 'none' });
       load();
     } catch {

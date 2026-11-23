@@ -53,6 +53,7 @@
   import { declineDispatchNotice, fetchDispatchNotices, fetchPlayerPriorityStatus, grabOrder } from '../../api/player';
   import type { PlayerPriorityStatus, PriorityNotice } from '../../api/player';
   import { datetime } from '../../utils/format';
+  import { promptModal } from '../../utils/dialog';
 
   const notices = ref<PriorityNotice[]>([]);
   // 优先派单权状态：与通知列表互补——通知回答「现在哪张单只通知了我」，
@@ -108,21 +109,14 @@
   }
 
   async function decline(item: PriorityNotice) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '拒绝优先通知',
-          content: '请填写拒绝原因',
-          editable: true,
-          placeholderText: '拒绝原因',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const { confirm, text } = await promptModal(
+      '拒绝优先通知',
+      '拒绝原因',
+      '请填写拒绝原因'
     );
-    if (!res.confirm) return;
+    if (!confirm) return;
     try {
-      await declineDispatchNotice(item.id, res.content?.trim() || '');
+      await declineDispatchNotice(item.id, text);
       uni.showToast({ title: '已拒绝', icon: 'none' });
       load();
     } catch {

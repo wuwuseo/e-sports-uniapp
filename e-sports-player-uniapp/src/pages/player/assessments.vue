@@ -110,6 +110,7 @@
   import { datetime } from '../../utils/format';
 
   import { skillLevelText } from '../../utils/levels';
+  import { promptModal } from '../../utils/dialog';
   // 服务端返回嵌套视图 `{ assessment, scores, weight_total_bp, dimension_count }`：
   // 主表字段必须从 row.assessment 读，逐维度得分与权重合计用于展示评级依据。
   const items = ref<PlayerAssessmentView[]>([]);
@@ -151,26 +152,19 @@
   }
 
   async function appeal(item: PlayerAssessment) {
-    const res = await new Promise<{ confirm: boolean; content?: string }>(
-      (resolve) => {
-        uni.showModal({
-          title: '发起申诉',
-          content: '请填写申诉理由',
-          editable: true,
-          placeholderText: '申诉理由',
-          success: (r) => resolve(r),
-          fail: () => resolve({ confirm: false }),
-        });
-      }
+    const { confirm, text } = await promptModal(
+      '发起申诉',
+      '申诉理由',
+      '请填写申诉理由'
     );
-    if (!res.confirm) return;
-    if (!res.content?.trim()) {
+    if (!confirm) return;
+    if (!text) {
       uni.showToast({ title: '申诉理由不能为空', icon: 'none' });
       return;
     }
     actingId.value = item.id;
     try {
-      await appealAssessment(item.id, res.content.trim());
+      await appealAssessment(item.id, text);
       uni.showToast({ title: '已提交申诉', icon: 'success' });
       load();
     } catch {
