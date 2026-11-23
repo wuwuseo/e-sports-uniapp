@@ -63,7 +63,7 @@
             已提交付款凭证，财务正在核验；核验完成前请勿重复付款。
           </view>
           <view v-else-if="aggregateUnavailable" class="notice warn">
-            在线收款服务暂未开通，请使用下方商家码付款。
+            {{ aggregateUnavailableText }}
           </view>
           <view v-else-if="dynamicPending" class="notice warn">
             当前有一笔在线支付待完成（{{ attemptRemaining }}），请先完成支付或等待超时后再试。
@@ -73,8 +73,9 @@
           </view>
           <view v-if="onlineError" class="notice warn">{{ onlineError }}</view>
 
-          <view class="actions">
+          <view v-if="!aggregateUnavailable" class="actions">
             <button
+              v-if="wechatAvailable"
               class="primary"
               :disabled="onlineDisabled"
               :loading="submitting && payingChannel === 'wechat'"
@@ -83,6 +84,7 @@
               微信支付
             </button>
             <button
+              v-if="alipayAvailable"
               class="primary alipay"
               :disabled="onlineDisabled"
               :loading="submitting && payingChannel === 'alipay'"
@@ -122,8 +124,9 @@
           <view class="muted">支付成功后页面自动刷新并返回上一页，请勿重复付款。</view>
         </view>
 
-        <!-- 固定码兜底：展示财务审核通过的收款账户，支持复制账号与查看二维码。 -->
-        <view v-if="!paid" class="card">
+        <!-- 固定码兜底：只在校验到已配置收款账户（或已有凭证记录）时展示，
+             未配置时整块隐藏，避免把用户引到不可用的付款方式。 -->
+        <view v-if="!paid && manualAvailable" class="card">
           <view class="section-title">商家码付款（人工核验）</view>
           <view class="muted">
             请按下方账户完成转账或扫码，保留付款截图，并提交流水号等待财务核验。
@@ -445,6 +448,23 @@
     }
   });
 
+  // 商家码只在真正配置了收款账户、或已有凭证需要展示进度时才出现；
+  // 未配置时整块隐藏，避免把用户引到不可用的付款方式。
+  const manualAvailable = computed(
+    () => accountOptions.value.length > 0 || !!latestProof.value
+  );
+  const aggregateUnavailableText = computed(() =>
+    manualAvailable.value
+      ? '在线收款服务暂未开通，请使用下方商家码付款。'
+      : '在线收款服务暂未开通，请联系客服确认收款方式。'
+  );
+  // 在线支付不可用时的兜底指引：商家码没配置就不要再把用户往「下方商家码」引。
+  const manualFallbackHint = computed(() =>
+    manualAvailable.value
+      ? '请使用下方商家码付款。'
+      : '请联系客服确认收款方式。'
+  );
+
   // TODO：礼物 / 充值的固定码凭证提交接口（/user/recharge-intents/:intentNo/payment-proof）待后端提供。
   // 内部接口路径只留在代码里，界面上给客户可理解的说明。
   const manualSupported = computed(() => businessType.value === 'order');
@@ -477,14 +497,24 @@
       aggregateUnavailable.value ||
       !entryToken.value
   );
+  // 渠道是否可用以后端下发为准；还没拿到 publicCheckout 时按可用处理，避免按钮闪烁。
+  const wechatAvailable = computed(
+    () => publicCheckout.value?.channels?.wechat !== false
+  );
+  const alipayAvailable = computed(
+    () => publicCheckout.value?.channels?.alipay !== false
+  );
   const channelHint = computed(() => {
     if (!publicCheckout.value) return '';
     const channels = publicCheckout.value.channels;
+    const manualHint = manualAvailable.value ? '或商家码' : '';
     if (!channels.wechat && !channels.alipay) {
-      return '当前无可用在线收款渠道，请使用下方商家码付款。';
+      return manualAvailable.value
+        ? '当前无可用在线收款渠道，请使用下方商家码付款。'
+        : '当前无可用在线收款渠道，请联系客服确认收款方式。';
     }
-    if (!channels.wechat) return '微信支付暂未开通，请使用支付宝或商家码。';
-    if (!channels.alipay) return '支付宝暂未开通，请使用微信或商家码。';
+    if (!channels.wechat) return `微信支付暂未开通，请使用支付宝${manualHint}。`;
+    if (!channels.alipay) return `支付宝暂未开通，请使用微信${manualHint}。`;
     return '';
   });
 
@@ -605,7 +635,8 @@
       // 聚合单创建失败（如在线收款未开通）：保留固定码兜底路径。
       aggregateUnavailable.value = true;
       onlineError.value =
-        (error as Error)?.message || '在线收款暂不可用，请使用下方商家码付款。';
+        (error as Error)?.message ||
+        `在线收款暂不可用，${manualFallbackHint.value}`;
     }
   }
 
@@ -780,7 +811,10 @@
       if (proofPending.value || proofVerified.value) {
         uni.showToast({ title: '凭证已提交或核销，暂不可再次发起支付', icon: 'none' });
       } else if (aggregateUnavailable.value) {
-        uni.showToast({ title: '在线收款暂未开通，请使用商家码付款', icon: 'none' });
+        uni.showToast({
+          title: `在线收款暂未开通，${manualFallbackHint.value}`,
+          icon: 'none',
+        });
       }
       return;
     }
@@ -802,7 +836,10 @@
     }
     const token = entryToken.value;
     if (!token) {
-      uni.showToast({ title: '在线收款暂不可用，请使用下方商家码付款', icon: 'none' });
+      uni.showToast({
+        title: `在线收款暂不可用，${manualFallbackHint.value}`,
+        icon: 'none',
+      });
       return;
     }
     const channels = publicCheckout.value?.channels;
@@ -839,8 +876,8 @@
     } catch (error) {
       const message = (error as Error)?.message || '';
       onlineError.value = message
-        ? `${message}。可改用下方商家码付款。`
-        : '在线收款暂不可用，请使用下方商家码付款。';
+        ? `${message}。${manualFallbackHint.value}`
+        : `在线收款暂不可用，${manualFallbackHint.value}`;
       if (/503|未开通|不可用|未配置|未启用/.test(message)) {
         aggregateUnavailable.value = true;
       }
