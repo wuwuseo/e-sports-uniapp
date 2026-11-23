@@ -17,9 +17,9 @@ import { fileURLToPath } from 'node:url';
 const BRANCHES = ['cs', 'customer', 'player', 'master'];
 const PKG_DIR = 'packages/esports-shared';
 
-// 允许按端差异的文件：同一个订单状态对不同角色是不同话术（"待客户确认" vs
-// "待你确认陪玩"），属于产品语义而非漂移，不参与一致性校验。
-const ALLOW_DIFF = new Set(['utils/format.ts']);
+// 允许按端差异的文件：只放角色话术常量（如"待客户确认" vs "待你确认陪玩"），
+// 属于产品语义而非漂移；金额换算等逻辑留在 utils/format.ts，受强一致校验保护。
+const ALLOW_DIFF = new Set(['utils/role-text.ts']);
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..', '..');
